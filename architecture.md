@@ -9,14 +9,17 @@
   - Links to the main JavaScript file
 
 - `src/main.js` - Main application entry point
-  - Initializes the game
-  - Imports and coordinates other modules
-  - Will eventually set up the game loop
+  - Initializes the Three.js scene, camera, and renderer
+  - Sets up lighting (ambient and directional)
+  - Creates a test cube for 3D verification
+  - Implements the animation loop using requestAnimationFrame
+  - Handles window resizing for responsive rendering
 
 ### Module Organization
 
 - `/core/` - Core game engine functionality
   - `engine.js` - Will handle Three.js setup, game loop, and renderer initialization
+    - In future iterations, the Three.js code in main.js will be refactored here
 
 - `/entities/` - Game objects and their behaviors
   - `aircraft.js` - Player's airplane model, physics, and controls
@@ -46,6 +49,18 @@
 3. **Progressive Enhancement**:
    - Start with basic functionality and add features incrementally
    - Test each component before integration
+
+## Current Implementation
+
+Currently, the basic Three.js scene is implemented directly in `main.js` for simplicity:
+- Scene with sky-blue background
+- Perspective camera at position (0, 0, 5)
+- WebGL renderer with antialiasing
+- Basic lighting setup (ambient + directional)
+- A rotating green cube for testing
+- Animation loop and resize handling
+
+In future steps, this functionality will be moved to appropriate modules, particularly to `/core/engine.js` for better code organization.
 
 ## Planned Architecture Flow
 
