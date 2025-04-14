@@ -42,6 +42,9 @@ class Aircraft {
     
     // Create a separate camera that's not part of the aircraft group
     this.setupChaseCamera();
+    
+    // Rotate 180 degrees to make the propeller point in the correct direction
+    this.object.rotateY(Math.PI); // 180 degrees around Y-axis
   }
   
   createAircraftMesh() {
@@ -55,22 +58,22 @@ class Aircraft {
     const propellerColor = 0x303030; // Dark grey for propeller
     const cockpitColor = 0x87CEEB; // Light blue for cockpit glass
     
-    // Create voxel-style fuselage (main body) - adjusted to be thinner and longer
-    const fuselageGeo = new THREE.BoxGeometry(3.5, 0.6, 0.7);
+    // Create voxel-style fuselage (main body) - oriented along Z axis now
+    const fuselageGeo = new THREE.BoxGeometry(0.7, 0.6, 3.5);
     const fuseMaterial = new THREE.MeshStandardMaterial({ color: lightGreen });
     const fuselage = new THREE.Mesh(fuselageGeo, fuseMaterial);
     fuselage.position.z = 0;
     this.object.add(fuselage);
     
     // Create camouflage pattern on top of fuselage
-    const camoTopGeo = new THREE.BoxGeometry(3.5, 0.1, 0.7);
+    const camoTopGeo = new THREE.BoxGeometry(0.7, 0.1, 3.5);
     const camoMaterial = new THREE.MeshStandardMaterial({ color: darkGreen });
     const camoTop = new THREE.Mesh(camoTopGeo, camoMaterial);
     camoTop.position.y = 0.35;
     this.object.add(camoTop);
     
-    // Create cockpit - moved forward and made more blocky
-    const cockpitGeo = new THREE.BoxGeometry(1.0, 0.5, 0.6);
+    // Create cockpit - positioned toward front
+    const cockpitGeo = new THREE.BoxGeometry(0.6, 0.5, 1.0);
     const cockpitMat = new THREE.MeshStandardMaterial({ 
       color: cockpitColor,
       transparent: true,
@@ -78,65 +81,65 @@ class Aircraft {
     });
     const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
     cockpit.position.y = 0.45;
-    cockpit.position.x = 0.5;
+    cockpit.position.z = -0.5; // Toward front (negative Z)
     this.object.add(cockpit);
     
-    // Create main wings - made wider and thinner
-    const wingGeo = new THREE.BoxGeometry(1.5, 0.1, 5.0);
+    // Create main wings - perpendicular to fuselage along X axis
+    const wingGeo = new THREE.BoxGeometry(5.0, 0.1, 1.5);
     const wingMat = new THREE.MeshStandardMaterial({ color: lightGreen });
     const wings = new THREE.Mesh(wingGeo, wingMat);
     wings.position.y = 0.1;
     this.object.add(wings);
     
     // Create wing camouflage pattern
-    const wingCamoGeo = new THREE.BoxGeometry(1.5, 0.05, 5.0);
+    const wingCamoGeo = new THREE.BoxGeometry(5.0, 0.05, 1.5);
     const wingCamoMat = new THREE.MeshStandardMaterial({ color: darkGreen });
     const wingCamo = new THREE.Mesh(wingCamoGeo, wingCamoMat);
     wingCamo.position.y = 0.13;
     this.object.add(wingCamo);
     
-    // Create RAF roundels on wings - moved to match image better
-    this.createRoundel(0, 0.16, 1.8, 0.7); // Right wing
-    this.createRoundel(0, 0.16, -1.8, 0.7); // Left wing
+    // Create RAF roundels on wings
+    this.createRoundel(1.8, 0.16, 0, 0.7); // Right wing
+    this.createRoundel(-1.8, 0.16, 0, 0.7); // Left wing
     
-    // Create tail - made thinner
-    const tailGeo = new THREE.BoxGeometry(1.2, 0.2, 0.7);
+    // Create tail - at back of fuselage (positive Z)
+    const tailGeo = new THREE.BoxGeometry(0.7, 0.2, 1.2);
     const tailMat = new THREE.MeshStandardMaterial({ color: lightGreen });
     const tail = new THREE.Mesh(tailGeo, tailMat);
-    tail.position.x = -1.5;
+    tail.position.z = 1.5; // At the back (positive Z)
     this.object.add(tail);
     
     // Create tail wings
-    const tailWingGeo = new THREE.BoxGeometry(0.8, 0.1, 1.5);
+    const tailWingGeo = new THREE.BoxGeometry(1.5, 0.1, 0.8);
     const tailWingMat = new THREE.MeshStandardMaterial({ color: lightGreen });
     const tailWing = new THREE.Mesh(tailWingGeo, tailWingMat);
-    tailWing.position.x = -1.5;
+    tailWing.position.z = 1.5; // At the back
     tailWing.position.y = 0;
     this.object.add(tailWing);
     
-    // Create vertical stabilizer - made taller
-    const vStabGeo = new THREE.BoxGeometry(0.8, 0.8, 0.1);
+    // Create vertical stabilizer - at the top back
+    const vStabGeo = new THREE.BoxGeometry(0.1, 0.8, 0.8);
     const vStabMat = new THREE.MeshStandardMaterial({ color: lightGreen });
     const vStab = new THREE.Mesh(vStabGeo, vStabMat);
-    vStab.position.x = -1.5;
-    vStab.position.y = 0.5;
+    vStab.position.z = 1.5; // At the back
+    vStab.position.y = 0.5; // On top
     this.object.add(vStab);
     
     // Create tail vertical camo
-    const tailCamoGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
+    const tailCamoGeo = new THREE.BoxGeometry(0.05, 0.8, 0.8);
     const tailCamoMat = new THREE.MeshStandardMaterial({ color: darkGreen });
     const tailCamo = new THREE.Mesh(tailCamoGeo, tailCamoMat);
-    tailCamo.position.x = -1.5;
-    tailCamo.position.y = 0.5;
-    tailCamo.position.z = 0.03;
+    tailCamo.position.z = 1.5; // At the back
+    tailCamo.position.y = 0.5; // On top
+    tailCamo.position.x = 0.03; // Slightly offset
     this.object.add(tailCamo);
     
-    // Create propeller and spinner
+    // Create propeller and spinner - at the front (negative Z)
     const spinnerGeo = new THREE.ConeGeometry(0.2, 0.4, 8);
-    const spinnerMat = new THREE.MeshStandardMaterial({ color: 0x303030 }); // Dark grey spinner like in image
+    const spinnerMat = new THREE.MeshStandardMaterial({ color: 0x303030 });
     const spinner = new THREE.Mesh(spinnerGeo, spinnerMat);
-    spinner.position.x = 1.8;
-    spinner.rotation.z = -Math.PI / 2;
+    spinner.position.z = -1.8; // At the front (negative Z)
+    spinner.rotation.x = -Math.PI / 2; // Point forward
     this.object.add(spinner);
     
     // Create propeller blades
@@ -151,11 +154,8 @@ class Aircraft {
     this.propeller.add(blade2);
     blade2.rotation.z = Math.PI / 2;
     
-    this.propeller.position.x = 2.0;
+    this.propeller.position.z = -2.0; // At the front (negative Z)
     this.object.add(this.propeller);
-    
-    // Point aircraft forward (along negative Z-axis)
-    this.object.rotation.y = Math.PI;
     
     // Add landing gear
     const gearLegGeo = new THREE.BoxGeometry(0.1, 0.4, 0.1);
@@ -163,19 +163,19 @@ class Aircraft {
     
     const leftGear = new THREE.Mesh(gearLegGeo, gearLegMat);
     leftGear.position.y = -0.4;
-    leftGear.position.z = 1;
-    leftGear.position.x = 0.5;
+    leftGear.position.x = 1.0;
+    leftGear.position.z = -0.5;
     this.object.add(leftGear);
     
     const rightGear = new THREE.Mesh(gearLegGeo, gearLegMat);
     rightGear.position.y = -0.4;
-    rightGear.position.z = -1;
-    rightGear.position.x = 0.5;
+    rightGear.position.x = -1.0;
+    rightGear.position.z = -0.5;
     this.object.add(rightGear);
     
     const rearGear = new THREE.Mesh(gearLegGeo, gearLegMat);
     rearGear.position.y = -0.3;
-    rearGear.position.x = -1.5;
+    rearGear.position.z = 1.5;
     rearGear.scale.y = 0.5;
     this.object.add(rearGear);
   }
@@ -247,25 +247,25 @@ class Aircraft {
     let targetYaw = 0;
     let targetVerticalVelocity = 0;
     
-    // Process vertical movement (directly change Y position, not just pitch)
+    // Process vertical movement - UP arrow should ascend, DOWN arrow should descend
     if (input.ArrowUp) {
-      targetPitch = -this.pitchRate * 0.5; // Slight visual pitch for feedback
-      targetVerticalVelocity = this.verticalSpeed; // Move upward
+      targetPitch = -this.pitchRate * 0.5; // Visual nose up
+      targetVerticalVelocity = this.verticalSpeed; // Move UP (positive Y)
     } else if (input.ArrowDown) {
-      targetPitch = this.pitchRate * 0.5; // Slight visual pitch for feedback
-      targetVerticalVelocity = -this.verticalSpeed; // Move downward
+      targetPitch = this.pitchRate * 0.5; // Visual nose down
+      targetVerticalVelocity = -this.verticalSpeed; // Move DOWN (negative Y)
     }
     
-    // Process horizontal movement (yaw + roll)
+    // Process horizontal movement - LEFT arrow should turn left, RIGHT arrow should turn right
     if (input.ArrowLeft) {
-      targetYaw = this.turnRate;
+      targetYaw = -this.turnRate; // Turn LEFT (negative yaw)
       if (this.bankIntoTurn) {
-        targetRoll = -this.maxRollAngle; // Bank into the turn
+        targetRoll = this.maxRollAngle; // Bank into left turn
       }
     } else if (input.ArrowRight) {
-      targetYaw = -this.turnRate;
+      targetYaw = this.turnRate; // Turn RIGHT (positive yaw)
       if (this.bankIntoTurn) {
-        targetRoll = this.maxRollAngle; // Bank into the turn
+        targetRoll = -this.maxRollAngle; // Bank into right turn
       }
     }
     
@@ -282,7 +282,8 @@ class Aircraft {
   
   updatePhysics(deltaTime) {
     // Create a rotation matrix for the yaw (turning)
-    const yawMatrix = new THREE.Matrix4().makeRotationY(this.yaw * deltaTime);
+    // IMPORTANT: Apply negative yaw to match the control directions
+    const yawMatrix = new THREE.Matrix4().makeRotationY(-this.yaw * deltaTime);
     
     // Apply the yaw rotation to the velocity vector
     this.velocity.applyMatrix4(yawMatrix);
@@ -299,8 +300,12 @@ class Aircraft {
     // Apply the combined movement to the position
     this.object.position.add(movement);
     
-    // Set the aircraft's orientation to face the direction of travel (but only for X and Z)
+    // Calculate the direction facing away from velocity (for correct orientation)
     const horizontalDirection = new THREE.Vector3(this.velocity.x, 0, this.velocity.z).normalize();
+    
+    // IMPORTANT: Keep direction inverted to maintain correct orientation with propeller facing forward
+    horizontalDirection.multiplyScalar(-1);
+    
     const lookAt = this.object.position.clone().add(horizontalDirection);
     
     // Maintain the current Y position when looking at the target
