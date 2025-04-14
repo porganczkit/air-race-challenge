@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import Aircraft from '../entities/aircraft.js';
+import InputHandler from '../utils/input.js';
 
 class GameEngine {
   constructor(canvasId) {
@@ -13,6 +14,9 @@ class GameEngine {
     this.isRunning = false;
     this.objects = [];
     this.clouds = [];
+
+    // Initialize input handler
+    this.inputHandler = new InputHandler();
 
     this.initThreeJs();
     this.setupEnvironment();
@@ -216,8 +220,8 @@ class GameEngine {
       }
     }
     
-    // Create aircraft
-    this.aircraft = new Aircraft();
+    // Create aircraft with input handler
+    this.aircraft = new Aircraft(this.inputHandler);
     
     // Add aircraft to scene
     this.scene.add(this.aircraft.getObject());

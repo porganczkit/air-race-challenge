@@ -4,9 +4,12 @@
 import * as THREE from 'three';
 
 class Aircraft {
-  constructor() {
+  constructor(inputHandler) {
     // Create a group to hold all aircraft parts
     this.object = new THREE.Group();
+    
+    // Store reference to input handler
+    this.inputHandler = inputHandler;
     
     // Create aircraft parts
     this.createAircraftMesh();
@@ -14,10 +17,25 @@ class Aircraft {
     // Set initial position
     this.object.position.set(0, 0, 0);
     
-    // Physics properties (will be used in later steps)
-    this.velocity = new THREE.Vector3(0, 0, 0);
+    // Physics properties
+    this.velocity = new THREE.Vector3(0, 0, -5); // Constant forward velocity
     this.acceleration = new THREE.Vector3(0, 0, 0);
     this.rotationVelocity = new THREE.Vector3(0, 0, 0);
+    
+    // Control parameters
+    this.maxPitchAngle = Math.PI / 4; // 45 degrees max pitch
+    this.maxRollAngle = Math.PI / 6; // 30 degrees max roll
+    this.turnRate = 1.0; // How fast the aircraft turns
+    this.pitchRate = 1.2; // How fast the aircraft pitches
+    this.bankIntoTurn = true; // Roll when turning
+    
+    // Movement smoothing
+    this.smoothingFactor = 0.1; // Lower = more smoothing but slower response
+    
+    // Current state
+    this.pitch = 0;
+    this.roll = 0;
+    this.yaw = 0;
     
     // Chase camera (will follow the aircraft)
     this.setupChaseCamera();
@@ -230,13 +248,86 @@ class Aircraft {
     this.camera.lookAt(lookTarget);
   }
   
+  handleControls(deltaTime) {
+    // Only process controls if we have an input handler
+    if (!this.inputHandler) return;
+    
+    // Get current input state
+    const input = this.inputHandler.getInputState();
+    
+    // Calculate target pitch, roll and yaw based on input
+    let targetPitch = 0;
+    let targetRoll = 0;
+    let targetYaw = 0;
+    
+    // Process vertical movement (pitch)
+    if (input.ArrowUp) {
+      targetPitch = -this.pitchRate; // Negative pitch = nose up
+    } else if (input.ArrowDown) {
+      targetPitch = this.pitchRate; // Positive pitch = nose down
+    }
+    
+    // Process horizontal movement (yaw + roll)
+    if (input.ArrowLeft) {
+      targetYaw = this.turnRate;
+      if (this.bankIntoTurn) {
+        targetRoll = -this.maxRollAngle; // Bank into the turn
+      }
+    } else if (input.ArrowRight) {
+      targetYaw = -this.turnRate;
+      if (this.bankIntoTurn) {
+        targetRoll = this.maxRollAngle; // Bank into the turn
+      }
+    }
+    
+    // Apply smoothing to control inputs
+    this.pitch += (targetPitch - this.pitch) * this.smoothingFactor * deltaTime * 60;
+    this.roll += (targetRoll - this.roll) * this.smoothingFactor * deltaTime * 60;
+    this.yaw += (targetYaw - this.yaw) * this.smoothingFactor * deltaTime * 60;
+    
+    // Clamp values to prevent extreme angles
+    this.pitch = Math.max(-this.maxPitchAngle, Math.min(this.maxPitchAngle, this.pitch));
+    this.roll = Math.max(-this.maxRollAngle, Math.min(this.maxRollAngle, this.roll));
+    
+    // Apply rotations to the aircraft
+    this.object.rotation.z = this.roll; // Roll (around Z axis)
+    this.object.rotation.x = this.pitch; // Pitch (around X axis)
+    
+    // Apply yaw rotation to velocity vector (turning)
+    const yawMatrix = new THREE.Matrix4().makeRotationY(this.yaw * deltaTime);
+    this.velocity.applyMatrix4(yawMatrix);
+    
+    // Keep constant speed
+    this.velocity.normalize().multiplyScalar(5);
+  }
+  
+  updatePhysics(deltaTime) {
+    // Apply velocity to position
+    const movement = this.velocity.clone().multiplyScalar(deltaTime);
+    this.object.position.add(movement);
+    
+    // Align aircraft with velocity direction (look where we're going)
+    if (this.velocity.length() > 0) {
+      const lookDirection = this.velocity.clone().normalize();
+      this.object.lookAt(this.object.position.clone().add(lookDirection));
+      
+      // Preserve manual pitch and roll on top of the look direction
+      this.object.rotateZ(this.roll);
+      this.object.rotateX(this.pitch);
+    }
+  }
+  
   update(deltaTime) {
     // Rotate propeller for visual effect
     if (this.propeller) {
       this.propeller.rotation.x += deltaTime * 20;
     }
     
-    // In future steps, we'll implement physics and controls here
+    // Handle keyboard input
+    this.handleControls(deltaTime);
+    
+    // Update physics
+    this.updatePhysics(deltaTime);
     
     // Update camera position to follow aircraft
     this.updateCamera();
