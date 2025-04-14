@@ -75,4 +75,23 @@
 - Test confirmed:
   - Object moves continuously within the loop
   - FPS counter shows stable frame rate
-  - Animation speed is consistent regardless of device performance 
+  - Animation speed is consistent regardless of device performance
+
+## Step 5: Load or Create Player Aircraft Model - COMPLETED
+
+- Created an Aircraft class in entities/aircraft.js:
+  - Implemented a Spitfire-like model using Three.js primitives
+  - Added fuselage, wings, tail, cockpit, and propeller
+  - Set up a chase camera that follows the aircraft
+  - Added a spinning propeller animation
+
+- Updated GameEngine to use the Aircraft entity:
+  - Removed test cube
+  - Added aircraft to the scene
+  - Set up a simple environment with a ground plane and grid
+  - Switched to aircraft's chase camera for rendering
+
+- Test confirmed:
+  - Aircraft model loads correctly in the scene
+  - Chase camera tracks from behind the aircraft
+  - Propeller animates correctly 

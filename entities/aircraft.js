@@ -24,77 +24,199 @@ class Aircraft {
   }
   
   createAircraftMesh() {
-    // Colors
-    const fuselageColor = 0x5D8AA8; // RAF Blue
-    const wingColor = 0x5D8AA8;
-    const propellerColor = 0x303030;
+    // Colors based on RAF Spitfire camouflage pattern
+    const darkGreen = 0x4C5B31; // Dark green camouflage
+    const lightGreen = 0x6B8E23; // Olive green camouflage
+    const brownColor = 0x8B4513; // Brown camouflage
+    const blueCircle = 0x1E3F66; // RAF roundel blue
+    const redCenter = 0xB22222; // RAF roundel center
+    const yellowRing = 0xFFA500; // Yellow ring around roundel
+    const propellerColor = 0x303030; // Dark grey for propeller
+    const cockpitColor = 0x87CEEB; // Light blue for cockpit glass
     
-    // Create fuselage (main body)
-    const fuselageGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
-    const fuseMaterial = new THREE.MeshStandardMaterial({ color: fuselageColor });
-    const fuselage = new THREE.Mesh(fuselageGeometry, fuseMaterial);
-    fuselage.rotation.z = Math.PI / 2; // Rotate to point forward
+    // Create voxel-style fuselage (main body)
+    const fuselageGeo = new THREE.BoxGeometry(3, 0.6, 0.8);
+    const fuseMaterial = new THREE.MeshStandardMaterial({ color: lightGreen });
+    const fuselage = new THREE.Mesh(fuselageGeo, fuseMaterial);
+    fuselage.position.z = 0;
     this.object.add(fuselage);
     
+    // Create camouflage pattern on top of fuselage
+    const camoTopGeo = new THREE.BoxGeometry(3, 0.1, 0.8);
+    const camoMaterial = new THREE.MeshStandardMaterial({ color: darkGreen });
+    const camoTop = new THREE.Mesh(camoTopGeo, camoMaterial);
+    camoTop.position.y = 0.35;
+    this.object.add(camoTop);
+    
+    // Create brown stripe down the middle of fuselage
+    const brownStripeGeo = new THREE.BoxGeometry(3, 0.1, 0.2);
+    const brownMaterial = new THREE.MeshStandardMaterial({ color: brownColor });
+    const brownStripe = new THREE.Mesh(brownStripeGeo, brownMaterial);
+    brownStripe.position.y = 0.35;
+    this.object.add(brownStripe);
+    
+    // Create nose section
+    const noseGeo = new THREE.BoxGeometry(0.6, 0.6, 0.8);
+    const noseMat = new THREE.MeshStandardMaterial({ color: brownColor });
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.position.z = 0;
+    nose.position.x = 1.7;
+    this.object.add(nose);
+    
     // Create cockpit
-    const cockpitGeometry = new THREE.SphereGeometry(0.2, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-    const cockpitMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x222222,
+    const cockpitGeo = new THREE.BoxGeometry(0.8, 0.4, 0.6);
+    const cockpitMat = new THREE.MeshStandardMaterial({ 
+      color: cockpitColor,
       transparent: true,
       opacity: 0.7
     });
-    const cockpit = new THREE.Mesh(cockpitGeometry, cockpitMaterial);
-    cockpit.position.y = 0.1;
-    cockpit.rotation.x = Math.PI;
+    const cockpit = new THREE.Mesh(cockpitGeo, cockpitMat);
+    cockpit.position.y = 0.5;
+    cockpit.position.x = 0.3;
     this.object.add(cockpit);
     
-    // Create wings
-    const wingGeometry = new THREE.BoxGeometry(1.2, 0.05, 0.3);
-    const wingMaterial = new THREE.MeshStandardMaterial({ color: wingColor });
-    const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+    // Create main wings
+    const wingGeo = new THREE.BoxGeometry(1.6, 0.2, 4);
+    const wingMat = new THREE.MeshStandardMaterial({ color: lightGreen });
+    const wings = new THREE.Mesh(wingGeo, wingMat);
+    wings.position.y = -0.1;
     this.object.add(wings);
     
+    // Create wing camouflage pattern
+    const wingCamoGeo = new THREE.BoxGeometry(1.6, 0.05, 4);
+    const wingCamoMat = new THREE.MeshStandardMaterial({ color: darkGreen });
+    const wingCamo = new THREE.Mesh(wingCamoGeo, wingCamoMat);
+    wingCamo.position.y = 0.13;
+    this.object.add(wingCamo);
+    
+    // Create wing brown patches
+    const wingBrownGeo = new THREE.BoxGeometry(1.6, 0.05, 1.5);
+    const wingBrownMat = new THREE.MeshStandardMaterial({ color: brownColor });
+    const wingBrownLeft = new THREE.Mesh(wingBrownGeo, wingBrownMat);
+    wingBrownLeft.position.y = 0.13;
+    wingBrownLeft.position.z = 1;
+    this.object.add(wingBrownLeft);
+    
+    const wingBrownRight = new THREE.Mesh(wingBrownGeo, wingBrownMat);
+    wingBrownRight.position.y = 0.13;
+    wingBrownRight.position.z = -1;
+    this.object.add(wingBrownRight);
+    
     // Create tail
-    const tailGeometry = new THREE.BoxGeometry(0.4, 0.05, 0.2);
-    const tailMaterial = new THREE.MeshStandardMaterial({ color: wingColor });
-    const tail = new THREE.Mesh(tailGeometry, tailMaterial);
-    tail.position.x = -0.6;
+    const tailGeo = new THREE.BoxGeometry(1.2, 0.2, 0.8);
+    const tailMat = new THREE.MeshStandardMaterial({ color: lightGreen });
+    const tail = new THREE.Mesh(tailGeo, tailMat);
+    tail.position.x = -1.7;
     this.object.add(tail);
     
     // Create vertical stabilizer
-    const stabilizerGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.05);
-    const stabilizerMaterial = new THREE.MeshStandardMaterial({ color: wingColor });
-    const stabilizer = new THREE.Mesh(stabilizerGeometry, stabilizerMaterial);
-    stabilizer.position.x = -0.6;
-    stabilizer.position.y = 0.1;
-    this.object.add(stabilizer);
+    const vStabGeo = new THREE.BoxGeometry(0.8, 0.6, 0.2);
+    const vStabMat = new THREE.MeshStandardMaterial({ color: lightGreen });
+    const vStab = new THREE.Mesh(vStabGeo, vStabMat);
+    vStab.position.x = -1.7;
+    vStab.position.y = 0.4;
+    this.object.add(vStab);
     
-    // Create propeller
-    const propellerGeometry = new THREE.BoxGeometry(0.05, 0.5, 0.05);
-    const propellerMaterial = new THREE.MeshStandardMaterial({ color: propellerColor });
-    this.propeller = new THREE.Mesh(propellerGeometry, propellerMaterial);
-    this.propeller.position.x = 0.8;
+    // Create tail vertical camo
+    const tailCamoGeo = new THREE.BoxGeometry(0.8, 0.6, 0.05);
+    const tailCamoMat = new THREE.MeshStandardMaterial({ color: darkGreen });
+    const tailCamo = new THREE.Mesh(tailCamoGeo, tailCamoMat);
+    tailCamo.position.x = -1.7;
+    tailCamo.position.y = 0.4;
+    tailCamo.position.z = 0.13;
+    this.object.add(tailCamo);
+    
+    // Create RAF roundels on wings (3 on each wing)
+    this.createRoundel(0, 0, 1.5, 0.6); // Right wing
+    this.createRoundel(0, 0, -1.5, 0.6); // Left wing
+    this.createRoundel(-1.5, 0.35, 0, 0.4); // Fuselage top
+    
+    // Create propeller and spinner
+    const spinnerGeo = new THREE.ConeGeometry(0.2, 0.4, 8);
+    const spinnerMat = new THREE.MeshStandardMaterial({ color: 0xE25822 }); // Orange/red spinner
+    const spinner = new THREE.Mesh(spinnerGeo, spinnerMat);
+    spinner.position.x = 2;
+    spinner.rotation.z = -Math.PI / 2;
+    this.object.add(spinner);
+    
+    // Create propeller blades
+    const propGeo = new THREE.BoxGeometry(0.1, 0.8, 0.05);
+    const propMat = new THREE.MeshStandardMaterial({ color: propellerColor });
+    this.propeller = new THREE.Group();
+    
+    const blade1 = new THREE.Mesh(propGeo, propMat);
+    const blade2 = new THREE.Mesh(propGeo, propMat);
+    
+    this.propeller.add(blade1);
+    this.propeller.add(blade2);
+    blade2.rotation.z = Math.PI / 2;
+    
+    this.propeller.position.x = 2.2;
     this.object.add(this.propeller);
     
     // Point aircraft forward (along negative Z-axis)
     this.object.rotation.y = Math.PI;
+    
+    // Add landing gear
+    const gearLegGeo = new THREE.BoxGeometry(0.1, 0.6, 0.1);
+    const gearLegMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    
+    const leftGear = new THREE.Mesh(gearLegGeo, gearLegMat);
+    leftGear.position.y = -0.5;
+    leftGear.position.z = 1;
+    leftGear.position.x = 0.5;
+    this.object.add(leftGear);
+    
+    const rightGear = new THREE.Mesh(gearLegGeo, gearLegMat);
+    rightGear.position.y = -0.5;
+    rightGear.position.z = -1;
+    rightGear.position.x = 0.5;
+    this.object.add(rightGear);
+    
+    const rearGear = new THREE.Mesh(gearLegGeo, gearLegMat);
+    rearGear.position.y = -0.3;
+    rearGear.position.x = -1.5;
+    rearGear.scale.y = 0.5;
+    this.object.add(rearGear);
+  }
+  
+  createRoundel(x, y, z, size) {
+    // Create RAF roundel (blue circle with red center and yellow ring)
+    const blueCircleGeo = new THREE.BoxGeometry(size, 0.05, size);
+    const blueCircleMat = new THREE.MeshStandardMaterial({ color: 0x1E3F66 });
+    const blueCircle = new THREE.Mesh(blueCircleGeo, blueCircleMat);
+    blueCircle.position.set(x, y + 0.13, z);
+    this.object.add(blueCircle);
+    
+    // Yellow ring
+    const yellowRingGeo = new THREE.BoxGeometry(size * 0.8, 0.06, size * 0.8);
+    const yellowRingMat = new THREE.MeshStandardMaterial({ color: 0xFFA500 });
+    const yellowRing = new THREE.Mesh(yellowRingGeo, yellowRingMat);
+    yellowRing.position.set(x, y + 0.14, z);
+    this.object.add(yellowRing);
+    
+    // Red center
+    const redCenterGeo = new THREE.BoxGeometry(size * 0.4, 0.07, size * 0.4);
+    const redCenterMat = new THREE.MeshStandardMaterial({ color: 0xB22222 });
+    const redCenter = new THREE.Mesh(redCenterGeo, redCenterMat);
+    redCenter.position.set(x, y + 0.15, z);
+    this.object.add(redCenter);
   }
   
   setupChaseCamera() {
     // Create a chase camera
     this.camera = new THREE.PerspectiveCamera(
-      75, // FOV
+      65, // FOV - wider field of view
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
     
-    // Set initial camera position behind and above aircraft
-    this.cameraOffset = new THREE.Vector3(0, 3, 10);
+    // Set camera position behind, above, and slightly to the side for a more dynamic view
+    this.cameraOffset = new THREE.Vector3(2, 4, 12);
     this.updateCamera();
     
     // Add camera to the aircraft group so it moves with the aircraft
-    // (We'll detach it later, this is just for structure)
     this.object.add(this.camera);
   }
   
@@ -102,14 +224,16 @@ class Aircraft {
     // Position camera relative to aircraft position
     this.camera.position.copy(this.object.position).add(this.cameraOffset);
     
-    // Look at the aircraft
-    this.camera.lookAt(this.object.position);
+    // Look at a point slightly ahead of the aircraft for better composition
+    const lookTarget = this.object.position.clone();
+    lookTarget.x += 2; // Look ahead of the aircraft
+    this.camera.lookAt(lookTarget);
   }
   
   update(deltaTime) {
     // Rotate propeller for visual effect
     if (this.propeller) {
-      this.propeller.rotation.x += deltaTime * 10;
+      this.propeller.rotation.x += deltaTime * 20;
     }
     
     // In future steps, we'll implement physics and controls here
