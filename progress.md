@@ -98,4 +98,30 @@
   - Voxel-style Spitfire aircraft model displays correctly
   - Camera provides a good view from behind and slightly to the side of the aircraft
   - Environment has a Minecraft-like appearance with terrain, clouds, and sky
-  - Propeller animates correctly and lighting shows the details of the aircraft 
+  - Propeller animates correctly and lighting shows the details of the aircraft
+
+## Step 6: Add Keyboard Controls for Plane Movement - COMPLETED
+
+- Created an InputHandler class in utils/input.js:
+  - Tracks keyboard input state for arrow keys
+  - Provides methods to query key states
+  - Prevents default browser behavior for arrow keys
+
+- Enhanced Aircraft class with flight controls:
+  - Implemented arrow key controls (Up/Down for pitch, Left/Right for turning)
+  - Added physics-based movement with constant forward velocity
+  - Implemented banking into turns for more realistic flight
+  - Added control parameter tuning (turn rate, pitch rate, max angles)
+  - Applied input smoothing for fluid control response
+
+- Updated GameEngine to integrate the input handler:
+  - Initialized input handler in the engine
+  - Passed the handler to the aircraft for controls
+  - Maintained separation of concerns between input and physics
+
+- Test confirmed:
+  - Aircraft responds to arrow key inputs
+  - Up/Down keys control pitch (ascend/descend)
+  - Left/Right keys control turning with proper banking
+  - Aircraft movement is smooth with appropriate physics
+  - Controls feel responsive but not twitchy 

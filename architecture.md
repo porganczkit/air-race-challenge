@@ -21,13 +21,20 @@
   - Processes window resize events
   - Sets up the voxel-style environment with terrain, clouds, and mountains
   - Creates and positions the aircraft in the scene
+  - Initializes input handler for controls
 
 - `entities/aircraft.js` - Aircraft entity implementation
   - Creates a voxel-style Spitfire aircraft model using Three.js primitives
   - Implements RAF roundels and proper camouflage coloring
   - Features a chase camera that follows the aircraft
   - Handles aircraft animation (propeller spinning)
-  - Will include physics and controls in future steps
+  - Processes keyboard input for flight controls
+  - Implements physics-based movement with smoothing
+
+- `utils/input.js` - Input handler implementation
+  - Captures and tracks keyboard input states
+  - Provides an API for checking key states
+  - Prevents default browser behavior for game controls
 
 ### Module Organization
 
@@ -35,8 +42,7 @@
   - `engine.js` - Three.js setup, game loop, and renderer initialization
 
 - `/entities/` - Game objects and their behaviors
-  - `aircraft.js` - Player's voxel-style Spitfire aircraft model
-  - `gate.js` - Obstacle gates with collision detection (to be implemented)
+  - `aircraft.js` - Player's voxel-style Spitfire aircraft model and controls
 
 - `/ui/` - User interface elements
   - `hud.js` - Heads-up display with timer, gate counter, and notifications
@@ -45,6 +51,7 @@
   - `leaderboard.js` - Supabase interaction for storing and retrieving scores
 
 - `/utils/` - Helper functions and utilities
+  - `input.js` - Keyboard input handling
   - `physics.js` - Collision detection and physics calculations
 
 - `/assets/` - Static assets
@@ -56,6 +63,7 @@
 
 2. **Clean Separation of Concerns**:
    - Game logic (entities) separate from rendering (core)
+   - Input handling separate from physics and rendering
    - UI separate from game mechanics
    - Service communication isolated in dedicated modules
 
@@ -82,6 +90,7 @@ The game engine is now implemented with proper structure:
   - Generates blocky clouds that gently animate
   - Adds distant mountains for visual depth
   - Creates and positions the aircraft in the scene
+  - Initializes and provides input handler to the aircraft
 
 ### Aircraft Entity
 - `Aircraft` class in `entities/aircraft.js`:
@@ -89,7 +98,16 @@ The game engine is now implemented with proper structure:
   - Features RAF roundels and proper camouflage pattern
   - Includes functioning propeller and landing gear
   - Implements a chase camera positioned for optimal viewing
-  - Includes update method for animations and will support controls
+  - Processes keyboard input for flight controls
+  - Implements physics-based movement with smoothing
+  - Handles turning, pitching, and rolling with appropriate visual feedback
+
+### Input Handling
+- `InputHandler` class in `utils/input.js`:
+  - Captures keyboard events and maintains state of arrow keys
+  - Provides methods to query current key states
+  - Prevents default browser actions for arrow keys
+  - Maintains clean separation between input capture and application logic
 
 ### Environment
 - Voxel-style ground terrain with height variation
@@ -109,20 +127,33 @@ The game loop follows this pattern:
 1. Request animation frame
 2. Calculate deltaTime since the last frame
 3. Update all game objects based on deltaTime
+   - Process input and update controls
+   - Apply physics and movement
+   - Update visual elements
 4. Update environment elements (cloud animation, etc.)
 5. Render the scene with the aircraft's chase camera
 6. Repeat
 
 This time-based approach ensures consistent movement speed regardless of the device's frame rate or performance.
 
+## Control Flow
+
+The control flow for aircraft movement is:
+1. `InputHandler` captures and tracks keyboard events
+2. `Aircraft.update()` calls `handleControls()` which queries input states
+3. Input values are converted to target pitch, roll, and yaw values
+4. Smoothing is applied to create fluid control response
+5. Physics calculations update the aircraft's position and orientation
+6. The aircraft model and camera are updated to reflect the new state
+
 ## Planned Architecture Flow
 
 1. User loads `index.html` which includes `main.js`
 2. `main.js` initializes the `GameEngine` from `core/engine.js`
 3. Engine creates scene, camera, renderer, and environment
-4. Aircraft entity is created and added to the engine
-5. Game loop runs, updating the aircraft and rendering each frame with the chase camera
-6. In future steps, keyboard controls will be added to control the aircraft
+4. Aircraft entity is created and linked to input handler
+5. Game loop runs, updating the aircraft based on player input
+6. In future steps, gates and collision detection will be added
 7. UI elements will display over the 3D scene
 8. Services will communicate with external APIs as needed
 
