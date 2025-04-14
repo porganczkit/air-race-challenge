@@ -2,6 +2,7 @@
 // This will handle the main game loop and Three.js setup 
 
 import * as THREE from 'three';
+import Aircraft from '../entities/aircraft.js';
 
 class GameEngine {
   constructor(canvasId) {
@@ -13,7 +14,8 @@ class GameEngine {
     this.objects = [];
 
     this.initThreeJs();
-    this.setupTestObject();
+    this.setupEnvironment();
+    this.setupAircraft();
   }
 
   initThreeJs() {
@@ -21,14 +23,17 @@ class GameEngine {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87CEEB); // Sky blue background
 
-    // Create camera
-    this.camera = new THREE.PerspectiveCamera(
+    // Create default camera (will be replaced by aircraft's chase camera)
+    this.defaultCamera = new THREE.PerspectiveCamera(
       75, // Field of view
       window.innerWidth / window.innerHeight, // Aspect ratio
       0.1, // Near clipping plane
       1000 // Far clipping plane
     );
-    this.camera.position.z = 5;
+    this.defaultCamera.position.z = 5;
+    
+    // Active camera will be set to the aircraft's camera later
+    this.activeCamera = this.defaultCamera;
 
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -50,19 +55,51 @@ class GameEngine {
     window.addEventListener('resize', () => this.handleResize());
   }
 
-  setupTestObject() {
-    // Create a test cube
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-    this.cube = new THREE.Mesh(geometry, material);
-    this.scene.add(this.cube);
-    this.objects.push(this.cube);
+  setupEnvironment() {
+    // Add a simple grid for reference
+    const gridHelper = new THREE.GridHelper(100, 100);
+    this.scene.add(gridHelper);
+    
+    // Add a simple ground plane
+    const groundGeometry = new THREE.PlaneGeometry(100, 100);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x7CFC00, // Lawn green
+      side: THREE.DoubleSide
+    });
+    const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    ground.rotation.x = Math.PI / 2; // Rotate to be horizontal
+    ground.position.y = -2; // Position below the aircraft
+    this.scene.add(ground);
+  }
+
+  setupAircraft() {
+    // Remove test cube if it exists
+    if (this.cube) {
+      this.scene.remove(this.cube);
+      const index = this.objects.indexOf(this.cube);
+      if (index !== -1) {
+        this.objects.splice(index, 1);
+      }
+    }
+    
+    // Create aircraft
+    this.aircraft = new Aircraft();
+    
+    // Add aircraft to scene
+    this.scene.add(this.aircraft.getObject());
+    this.objects.push(this.aircraft);
+    
+    // Use aircraft's camera as the active camera
+    this.activeCamera = this.aircraft.getCamera();
+    
+    // Position aircraft at starting point
+    this.aircraft.getObject().position.set(0, 0, -10);
   }
 
   handleResize() {
     // Update camera aspect ratio and projection matrix
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
+    this.activeCamera.aspect = window.innerWidth / window.innerHeight;
+    this.activeCamera.updateProjectionMatrix();
 
     // Update renderer size
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -97,17 +134,15 @@ class GameEngine {
     // Update game objects
     this.update(this.deltaTime, this.elapsedTime);
 
-    // Render the scene
-    this.renderer.render(this.scene, this.camera);
+    // Render the scene with the active camera
+    this.renderer.render(this.scene, this.activeCamera);
   }
 
   update(deltaTime, elapsedTime) {
     // Update all game objects
     this.objects.forEach(object => {
-      // For now, just rotate the cube
-      if (object === this.cube) {
-        object.rotation.x += deltaTime * 0.5;
-        object.rotation.y += deltaTime * 0.7;
+      if (typeof object.update === 'function') {
+        object.update(deltaTime, elapsedTime);
       }
     });
   }

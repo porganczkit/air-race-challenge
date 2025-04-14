@@ -56,4 +56,23 @@
 - Test confirmed:
   - Rotating green cube appears on screen
   - Lighting creates proper shadows and reflections
-  - Animation runs smoothly 
+  - Animation runs smoothly
+
+## Step 4: Implement Game Loop - COMPLETED
+
+- Created a GameEngine class in core/engine.js:
+  - Proper initialization of Three.js components
+  - Time-based animation using THREE.Clock
+  - Delta time calculation for consistent movement regardless of frame rate
+  - Object tracking for updates and rendering
+  - Methods for adding and removing objects from the scene
+
+- Refactored main.js to use the new GameEngine:
+  - Removed direct Three.js code
+  - Added FPS counter for performance monitoring
+  - Cleaner separation of initialization and game loop
+
+- Test confirmed:
+  - Object moves continuously within the loop
+  - FPS counter shows stable frame rate
+  - Animation speed is consistent regardless of device performance 
