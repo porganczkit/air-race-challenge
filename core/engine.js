@@ -9,6 +9,9 @@ import FinishBridge from '../entities/finish_bridge.js';
 import Tree from '../entities/tree.js';
 import Person from '../entities/person.js';
 
+// Penalty constants
+const MISSED_GATE_PENALTY = 10; // seconds
+
 class GameEngine {
   constructor(canvasId) {
     // Get the canvas element
@@ -39,6 +42,12 @@ class GameEngine {
     // Initialize input handler
     this.inputHandler = new InputHandler();
 
+    // Game State & Timing
+    this.gameState = 'ready'; // 'ready', 'playing', 'finished'
+    this.gameStartTime = 0;
+    this.finalTime = 0;
+    this.penaltyTime = 0; // Total accumulated penalty time
+
     // Initialize components
     this.initThreeJs();
     this.setupEnvironment();
@@ -48,6 +57,7 @@ class GameEngine {
     this.setupGates();
     this.setupFinishBridge();
     this.setupTargetArrow(); // Call setup for the arrow
+    this.setupHUD(); // Call setup for the HUD
     
     console.log('Game engine initialized successfully');
   }
@@ -464,6 +474,9 @@ class GameEngine {
         this.gates[0].startPulseEffect(); // Start pulsing
       }
       
+      // Example: Ensure gates are reset visually at start
+      this.gates.forEach(gate => gate.reset ? gate.reset() : null);
+      
       console.log(`Created ${this.gates.length} gates`);
     } catch (error) {
       console.error('Error setting up gates:', error);
@@ -574,13 +587,13 @@ class GameEngine {
 
   // Game loop methods
   start() {
-    if (!this.isRunning) {
-      this.clock.start();
-      this.isRunning = true;
-      this.lastFrameTime = 0;
-      console.log('Game loop started');
-      this.animate(0);
-    }
+    if (this.isRunning) return;
+    console.log('Starting game engine loop...');
+    this.isRunning = true;
+    this.clock.start(); // Ensure clock is running
+    this.lastFrameTime = performance.now(); // Initialize frame limiter time
+    requestAnimationFrame((time) => this.animate(time)); 
+    // NOTE: Actual game start logic (timer, state) is now in startGame()
   }
 
   stop() {
@@ -625,37 +638,39 @@ class GameEngine {
 
   update(deltaTime, elapsedTime) {
     try {
-      // Update all game objects (including aircraft)
-      for (const object of this.objects) {
-        if (object.update) {
-          object.update(deltaTime);
-        }
+      // Update physics objects (only when playing)
+      if (this.aircraft && this.gameState === 'playing') {
+        this.aircraft.update(deltaTime, this.inputHandler.getInputState(), elapsedTime);
       }
       
-      // Animate clouds (bobbing up and down)
-      for (const cloud of this.clouds) {
-        // Move clouds slowly sideways
-        cloud.group.position.x += cloud.speed * deltaTime;
-        
-        // Reset cloud when it moves too far
-        if (cloud.group.position.x > 150) {
-          cloud.group.position.x = -150;
-        }
-        
-        // Bob clouds up and down
+      // Always ensure the active camera is the aircraft's camera if the aircraft exists
+      if (this.aircraft) {
+           this.activeCamera = this.aircraft.getCamera(); 
+      }
+
+      // Update other dynamic objects (e.g., clouds, effects)
+      this.clouds.forEach(cloud => {
+        // Example: Gentle bobbing - Use defined cloud properties
         cloud.group.position.y = cloud.startY + Math.sin(elapsedTime * cloud.bobSpeed) * cloud.bobHeight;
-      }
-      
-      // Check for gate collisions if aircraft exists and gates remain
-      if (this.aircraft && this.gates.length > 0 && this.currentGateIndex < this.gates.length) {
-        this.checkGateCollisions();
-      }
-      
-      // Update target arrow position and direction
+      });
+
+      // Update target arrow
       this.updateTargetArrow();
+
+      // Check game logic (collisions, gates) only when playing
+      if (this.gameState === 'playing') {
+        this.checkGateCollisions();
+        // Add other checks like bridge collision, ground collision later
+        // this.checkBridgeCollision(); 
+        // this.checkGroundCollision();
+      }
+
+      // Update HUD (call placeholder)
+      this.updateHUD(); 
 
     } catch (error) {
       console.error('Error in update loop:', error);
+      this.stop(); // Stop the loop on critical error
     }
   }
   
@@ -711,40 +726,40 @@ class GameEngine {
   }
   
   gateCompleted(gate) {
-    // Mark the gate as passed
-    gate.setPassed(); 
-    gate.stopPulseEffect(); // Stop pulsing effect
-    
-    console.log(`Gate ${gate.id + 1} completed!`);
-    
-    // Update the current gate index
+    if (gate.isPassed || gate.isMissed || this.gameState !== 'playing') return; // Only score if playing
+
+    gate.setPassed(); // Use setPassed instead of setCompleted if that exists
+    gate.stopPulseEffect();
+    console.log(`Gate ${gate.id + 1} passed.`);
+
+    // Award points (implement later if needed)
+    // this.score += 100; 
+    // this.showPointsEarned(gate.getObject().position, 100);
+
+    // Advance to the next gate
     this.currentGateIndex++;
     
-    // Set the next gate as target, if available
     if (this.currentGateIndex < this.gates.length) {
       const nextGate = this.gates[this.currentGateIndex];
       nextGate.setTarget();
-      nextGate.startPulseEffect(); // Start pulsing for the next gate
+      nextGate.startPulseEffect();
       console.log(`Next gate: ${this.currentGateIndex + 1}`);
     } else {
       console.log('All gates completed!');
-      // Potentially trigger finish sequence here
+      this.finishGame(); // Finish game after last gate passed
     }
-    
-    // Add brief particle effect (placeholder)
-    // this.showGatePassedParticles(gate.position);
   }
 
   // Add method to handle missed gates
   gateMissed(gate) {
-    if (gate.isPassed || gate.isMissed) return; // Don't mark again
+    if (gate.isPassed || gate.isMissed || this.gameState !== 'playing') return; // Don't mark again, only penalize if playing
 
     gate.setMissed();
     gate.stopPulseEffect();
     console.log(`Gate ${gate.id + 1} missed.`);
 
-    // Apply penalty (Step 12 - implement later)
-    // this.applyTimePenalty();
+    // Apply penalty (Step 12)
+    this.applyTimePenalty(MISSED_GATE_PENALTY, gate.getObject().position);
 
     // Advance to the next gate anyway
     this.currentGateIndex++;
@@ -757,12 +772,65 @@ class GameEngine {
       console.log(`Next gate (after miss): ${this.currentGateIndex + 1}`);
     } else {
         console.log('Last gate missed, course finished.');
-         // Potentially trigger finish sequence here
+        this.finishGame(); // Finish game after last gate is missed
     }
   }
 
-  // Placeholder for particle effects
-  // showGatePassedParticles(position) { ... }
+  applyTimePenalty(seconds, position = null) {
+    if (this.gameState !== 'playing') return;
+
+    this.penaltyTime += seconds;
+    console.log(`Applied penalty: +${seconds}s. Total penalty: ${this.penaltyTime}s`);
+    
+    // Show notification on screen
+    const message = `✖ MISSED GATE – Penalty +${seconds}s`;
+    this.showPenaltyNotification(message, position);
+
+    // Optional: Add sound effect here later
+    // this.audioManager.playSound('penalty'); 
+  }
+
+  showPenaltyNotification(message, position = null) {
+    // Create a notification element
+    const notificationElement = document.createElement('div');
+    notificationElement.textContent = message;
+    notificationElement.style.position = 'absolute';
+    notificationElement.style.color = 'red';
+    notificationElement.style.fontSize = '24px';
+    notificationElement.style.fontWeight = 'bold';
+    notificationElement.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.7)';
+    notificationElement.style.zIndex = '1010'; // Above other HUD elements
+    notificationElement.style.opacity = '0'; // Start faded out
+    notificationElement.style.transition = 'opacity 0.3s ease-in-out, top 2.5s ease-out';
+    notificationElement.style.textAlign = 'center';
+    notificationElement.style.width = '100%'; // Center horizontally
+    notificationElement.style.pointerEvents = 'none'; // Don't block clicks
+
+    document.body.appendChild(notificationElement);
+
+    // Position calculation (Placeholder: top-center for now)
+    // TODO: Improve positioning based on 3D `position` if provided
+    notificationElement.style.left = '0'; 
+    notificationElement.style.top = '15%'; // Position below potential top HUD
+
+    // Fade in, hold, fade out
+    setTimeout(() => {
+      notificationElement.style.opacity = '1'; // Fade in
+    }, 10); // Small delay to allow transition
+
+    setTimeout(() => {
+      notificationElement.style.opacity = '0'; // Start fade out
+      // Optional: Move up slightly during fade out
+      // notificationElement.style.top = '10%'; 
+    }, 2500); // Hold for 2.5 seconds before fading out
+
+    // Remove element after animation
+    setTimeout(() => {
+      if (notificationElement.parentNode) {
+        notificationElement.parentNode.removeChild(notificationElement);
+      }
+    }, 3000); // Remove after 3 seconds (0.3s fade in + 2.5s hold + 0.2s buffer/fadeout)
+  }
 
   addObject(object) {
     this.objects.push(object);
@@ -817,6 +885,268 @@ class GameEngine {
       // Hide arrow if all gates are passed or aircraft doesn't exist
       this.targetArrow.visible = false;
     }
+  }
+
+  // --- Game State Methods (To be implemented/refined) ---
+
+  setupHUD() {
+    // Remove existing HUD if any (e.g., during restart)
+    const existingHUD = document.getElementById('hud-container');
+    if (existingHUD) {
+      existingHUD.remove();
+    }
+
+    // Create HUD container
+    this.hudContainer = document.createElement('div');
+    this.hudContainer.id = 'hud-container';
+    this.hudContainer.style.position = 'absolute';
+    this.hudContainer.style.top = '0';
+    this.hudContainer.style.left = '0';
+    this.hudContainer.style.width = '100%';
+    this.hudContainer.style.height = '100%'; // Cover whole screen for centering
+    this.hudContainer.style.pointerEvents = 'none'; // Allow clicks through
+    this.hudContainer.style.zIndex = '1000';
+    this.hudContainer.style.fontFamily = 'Arial, sans-serif';
+    this.hudContainer.style.color = 'white';
+    this.hudContainer.style.textShadow = '1px 1px 2px rgba(0,0,0,0.7)';
+    document.body.appendChild(this.hudContainer);
+
+    this.hudElements = {};
+
+    // Timer display (top-right)
+    const timerElement = document.createElement('div');
+    timerElement.id = 'timer-display';
+    timerElement.style.position = 'absolute';
+    timerElement.style.top = '20px';
+    timerElement.style.right = '20px';
+    timerElement.style.fontSize = '24px';
+    timerElement.textContent = 'Time: 0.0s';
+    this.hudContainer.appendChild(timerElement);
+    this.hudElements.timer = timerElement;
+
+    // Penalty display (below timer? or maybe integrated)
+    // Let's add it below the timer for now.
+    const penaltyElement = document.createElement('div');
+    penaltyElement.id = 'penalty-display';
+    penaltyElement.style.position = 'absolute';
+    penaltyElement.style.top = '50px'; // Below timer
+    penaltyElement.style.right = '20px';
+    penaltyElement.style.fontSize = '18px';
+    penaltyElement.style.color = '#ffdddd'; // Light red
+    penaltyElement.textContent = 'Penalty: 0s';
+    this.hudContainer.appendChild(penaltyElement);
+    this.hudElements.penalty = penaltyElement;
+
+    // Gate counter (top-left)
+    const gateElement = document.createElement('div');
+    gateElement.id = 'gate-counter';
+    gateElement.style.position = 'absolute';
+    gateElement.style.top = '20px';
+    gateElement.style.left = '20px';
+    gateElement.style.fontSize = '20px';
+    gateElement.textContent = 'Gates: 0/0';
+    this.hudContainer.appendChild(gateElement);
+    this.hudElements.gates = gateElement;
+
+    // Game state message (center)
+    const messageElement = document.createElement('div');
+    messageElement.id = 'game-message';
+    messageElement.style.position = 'absolute';
+    messageElement.style.top = '40%';
+    messageElement.style.left = '50%';
+    messageElement.style.transform = 'translate(-50%, -50%)';
+    messageElement.style.fontSize = '36px';
+    messageElement.style.textAlign = 'center';
+    messageElement.style.display = 'block'; // Show initially
+    messageElement.innerHTML = 'Air Race Challenge<br><span style="font-size: 20px">Press SPACE to Start</span>';
+    this.hudContainer.appendChild(messageElement);
+    this.hudElements.message = messageElement;
+
+    // Result screen (center, hidden initially)
+    const resultElement = document.createElement('div');
+    resultElement.id = 'result-screen';
+    resultElement.style.position = 'absolute';
+    resultElement.style.top = '50%';
+    resultElement.style.left = '50%';
+    resultElement.style.transform = 'translate(-50%, -50%)';
+    resultElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    resultElement.style.padding = '30px';
+    resultElement.style.borderRadius = '10px';
+    resultElement.style.fontSize = '20px';
+    resultElement.style.textAlign = 'center';
+    resultElement.style.display = 'none'; // Hidden initially
+    resultElement.style.pointerEvents = 'auto'; // Allow clicks on button
+    resultElement.innerHTML = `
+      <h2>Course Complete!</h2>
+      <p>Time: <span id="result-time">0.0s</span></p>
+      <p>Penalty: <span id="result-penalty">0s</span></p>
+      <p style="font-weight: bold;">Final Time: <span id="result-final-time">0.0s</span></p>
+      <p>Gates: <span id="result-gates">0/0</span></p>
+      <button id="restart-button" style="padding: 10px 20px; margin-top: 20px; font-size: 18px; cursor: pointer;">Restart Race</button>
+    `;
+    this.hudContainer.appendChild(resultElement);
+    this.hudElements.result = resultElement;
+
+    // Add event listener for restart button
+    // Ensure listener is added only once and refers to the correct engine instance
+    const restartButton = resultElement.querySelector('#restart-button');
+    if (restartButton) {
+        // Remove previous listener if any to prevent duplicates
+        // A more robust way might involve storing the listener function reference
+        restartButton.replaceWith(restartButton.cloneNode(true)); // Clone to remove listeners
+        this.hudContainer.querySelector('#restart-button').addEventListener('click', () => {
+            this.restartGame();
+        });
+    } else {
+        console.error('Restart button not found in HUD setup');
+    }
+    
+    // Setup space key listener for starting game
+    // Use a flag to prevent multiple listeners if setupHUD is called again
+    if (!this.spaceKeyListenerAdded) {
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space' && this.gameState === 'ready') {
+                this.startGame();
+            }
+        });
+        this.spaceKeyListenerAdded = true; // Mark listener as added
+    }
+
+    console.log('HUD setup complete');
+  }
+
+  updateHUD() {
+    if (!this.hudElements) return; // Check if HUD is initialized
+
+    const gatesTotal = this.gates.length;
+    const gatesPassed = this.currentGateIndex; // Approximation, could be refined
+
+    // Update Gate Counter
+    this.hudElements.gates.textContent = `Gates: ${gatesPassed}/${gatesTotal}`;
+
+    // Update Timer and Penalty only if playing
+    if (this.gameState === 'playing') {
+      const currentTime = this.clock.getElapsedTime() - this.gameStartTime;
+      this.hudElements.timer.textContent = `Time: ${currentTime.toFixed(1)}s`;
+      this.hudElements.penalty.textContent = `Penalty: ${this.penaltyTime}s`;
+      this.hudElements.penalty.style.display = this.penaltyTime > 0 ? 'block' : 'none'; // Show only if penalty > 0
+    }
+
+    // Show/Hide elements based on gameState
+    if (this.gameState === 'ready') {
+        this.hudElements.message.style.display = 'block';
+        this.hudElements.result.style.display = 'none';
+        // Reset timer/penalty display for ready state
+        this.hudElements.timer.textContent = 'Time: 0.0s';
+        this.hudElements.penalty.textContent = 'Penalty: 0s';
+        this.hudElements.penalty.style.display = 'none'; 
+    } else if (this.gameState === 'playing') {
+        this.hudElements.message.style.display = 'none';
+        this.hudElements.result.style.display = 'none';
+    } else if (this.gameState === 'finished') {
+        this.hudElements.message.style.display = 'none';
+        this.hudElements.result.style.display = 'block';
+        // Update result screen content (ensure this is done once in finishGame)
+    }
+  }
+
+  startGame() {
+    if (this.gameState !== 'ready') return;
+    console.log("Starting game...");
+    this.gameState = 'playing';
+    this.penaltyTime = 0;
+    this.currentGateIndex = 0;
+    this.finalTime = 0;
+    
+    // Reset aircraft to starting position/state
+    if (this.aircraft) {
+        this.aircraft.reset();
+    }
+    
+    // Reset gate states
+    this.gates.forEach(gate => gate.reset ? gate.reset() : console.warn('Gate reset method missing')); 
+    
+    // Set first gate target
+    if (this.gates.length > 0) {
+        this.gates[0].setTarget();
+        this.gates[0].startPulseEffect();
+    }
+    
+    this.gameStartTime = this.clock.getElapsedTime();
+    
+    // Update HUD for playing state
+    if (this.hudElements) {
+      this.hudElements.message.style.display = 'none';
+      this.hudElements.result.style.display = 'none';
+      this.hudElements.penalty.style.display = 'none'; // Hide penalty initially
+    }
+    
+    // Ensure aircraft controls are active
+    // Assuming InputHandler is managed correctly elsewhere
+
+    console.log("Game started at time:", this.gameStartTime);
+  }
+
+  finishGame() {
+    if (this.gameState !== 'playing') return;
+    console.log("Finishing game...");
+    this.gameState = 'finished';
+    this.finalTime = this.clock.getElapsedTime() - this.gameStartTime;
+    const finalAdjustedTime = this.finalTime + this.penaltyTime;
+
+    console.log(`Raw Time: ${this.finalTime.toFixed(2)}s`);
+    console.log(`Penalty: ${this.penaltyTime}s`);
+    console.log(`Final Adjusted Time: ${finalAdjustedTime.toFixed(2)}s`);
+
+    // Update and display results in HUD
+    if (this.hudElements && this.hudElements.result) {
+        document.getElementById('result-time').textContent = `${this.finalTime.toFixed(1)}s`;
+        document.getElementById('result-penalty').textContent = `${this.penaltyTime}s`;
+        document.getElementById('result-final-time').textContent = `${finalAdjustedTime.toFixed(1)}s`;
+        document.getElementById('result-gates').textContent = `${this.currentGateIndex}/${this.gates.length}`; // Use current index for passed gates
+        this.hudElements.result.style.display = 'block';
+    }
+
+    // Optional: Stop aircraft controls
+    // this.inputHandler.disable(); 
+  }
+
+  restartGame() {
+    console.log("Restarting game...");
+    
+    // Reset game state variables
+    this.penaltyTime = 0;
+    this.currentGateIndex = 0;
+    this.gameStartTime = 0;
+    this.finalTime = 0;
+    
+    // Reset aircraft position/state
+    if (this.aircraft) {
+      this.aircraft.reset(); // Assuming aircraft has a reset method
+      this.activeCamera = this.aircraft.getCamera(); // Re-assign camera after reset
+    }
+    
+    // Reset gate states
+    this.gates.forEach(gate => gate.reset ? gate.reset() : console.warn('Gate reset method missing')); 
+    
+    // Set game state to ready
+    this.gameState = 'ready';
+
+    // Update HUD for ready state
+    if (this.hudElements) {
+      this.hudElements.result.style.display = 'none';
+      this.hudElements.message.innerHTML = 'Air Race Challenge<br><span style="font-size: 20px">Press SPACE to Start</span>';
+      this.hudElements.message.style.display = 'block';
+      this.hudElements.timer.textContent = 'Time: 0.0s';
+      this.hudElements.penalty.textContent = 'Penalty: 0s';
+      this.hudElements.penalty.style.display = 'none';
+      this.hudElements.gates.textContent = `Gates: 0/${this.gates.length}`;
+    }
+
+    // Ensure controls are ready
+    // this.inputHandler.enable();
+
+    console.log("Game ready to start.");
   }
 }
 

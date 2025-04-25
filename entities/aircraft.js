@@ -225,17 +225,21 @@ class Aircraft {
   updateCamera() {
     // Get the aircraft's current position and orientation
     const position = this.object.position.clone();
-    const direction = this.velocity.clone().normalize();
     
-    // Calculate camera position based on aircraft's position and direction
-    // This positions the camera at a fixed distance behind the aircraft
-    const cameraPosition = position.clone().sub(direction.multiplyScalar(this.cameraOffset.z));
+    // Calculate forward direction directly from the aircraft's orientation
+    const forwardDirection = new THREE.Vector3(0, 0, -1);
+    forwardDirection.applyQuaternion(this.object.quaternion);
+    forwardDirection.normalize(); // Ensure it's a unit vector
+    
+    // Calculate camera position based on aircraft's position and forward direction
+    const cameraPosition = position.clone().sub(forwardDirection.multiplyScalar(this.cameraOffset.z));
     cameraPosition.y = position.y + this.cameraOffset.y; // Add height offset
     
     this.camera.position.copy(cameraPosition);
     
-    // Look at the aircraft
-    this.camera.lookAt(position);
+    // Look slightly ahead of the aircraft for a better view
+    const lookAtTarget = position.clone().add(forwardDirection.multiplyScalar(5)); // Look 5 units ahead
+    this.camera.lookAt(lookAtTarget);
   }
   
   update(deltaTime) {
@@ -352,6 +356,9 @@ class Aircraft {
     // Rotate propeller based on throttle and forward speed
     const propellerSpeed = this.forwardSpeed * 2; // Base propeller speed on forward motion
     this.propeller.rotation.z += propellerSpeed * deltaTime;
+    
+    // Update the chase camera position and orientation
+    this.updateCamera();
   }
 
   // updateCamera() { // Original camera code now handled in engine.js
@@ -374,6 +381,29 @@ class Aircraft {
   
   getCamera() {
     return this.camera;
+  }
+
+  // Method to reset aircraft state to initial values
+  reset() {
+      // Reset position and rotation
+      this.object.position.set(0, 10, -20); // Example starting position
+      this.object.rotation.set(0, 0, 0); 
+      this.object.quaternion.set(0, 0, 0, 1);
+
+      // Reset physics state
+      this.velocity.set(0, 0, -this.forwardSpeed); // Reset to initial forward velocity
+      this.acceleration.set(0, 0, 0);
+      this.rotationVelocity.set(0, 0, 0);
+      this.verticalVelocity = 0;
+      this.angularMomentum.set(0, 0, 0);
+      this.pitch = 0;
+      this.roll = 0;
+      this.yaw = 0;
+      
+      // Update camera immediately to reflect reset position
+      this.updateCamera(); 
+      
+      console.log("Aircraft reset to initial state.");
   }
 }
 

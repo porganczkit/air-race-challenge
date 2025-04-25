@@ -12,6 +12,8 @@ class Gate {
     this.isMissed = false;
     this.isTarget = false;
     
+    console.log(`Creating Gate ${id + 1}`);
+    
     // Create a group to hold all gate parts
     this.object = new THREE.Group();
     
@@ -24,13 +26,24 @@ class Gate {
     
     // Create bounding box for collision detection
     this.createBoundingBox();
+
+    // Debug: Ensure all methods are properly attached
+    if (typeof this.setCompleted !== 'function') {
+      console.error(`Gate ${id + 1} missing setCompleted method!`);
+    }
+    if (typeof this.setPassed !== 'function') {
+      console.error(`Gate ${id + 1} missing setPassed method!`);
+    }
+    
+    console.log(`Gate ${id + 1} created successfully with methods:`, 
+                Object.getOwnPropertyNames(Object.getPrototypeOf(this)).filter(m => typeof this[m] === 'function'));
   }
   
   createGateMesh() {
     // Gate dimensions
-    const gateRadius = 5; // Gate radius
-    const gateThickness = 0.5; // Wall thickness
-    const gateDepth = 2; // Depth/length of the gate
+    const gateRadius = 15; // Gate radius (increased from step 11)
+    const gateThickness = 1.5; // Wall thickness (increased from step 11)
+    const gateDepth = 6; // Depth/length of the gate (increased from step 11)
     
     // Create a tube/torus for the gate
     const orangeColor = 0xFF7F00; // Bright orange color
@@ -85,12 +98,12 @@ class Gate {
   
   createGateNumber() {
     // Create a platform for the number
-    const platformGeometry = new THREE.BoxGeometry(1.5, 1.5, 0.2);
+    const platformGeometry = new THREE.BoxGeometry(4, 4, 0.5);
     const platformMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF });
     const platform = new THREE.Mesh(platformGeometry, platformMaterial);
     
     // Position the platform above the gate
-    platform.position.y = 6;
+    platform.position.y = 18;
     
     this.object.add(platform);
     
@@ -105,19 +118,19 @@ class Gate {
     });
     
     // Create number plane
-    const numberGeometry = new THREE.PlaneGeometry(1.4, 1.4);
+    const numberGeometry = new THREE.PlaneGeometry(3.8, 3.8);
     const numberMesh = new THREE.Mesh(numberGeometry, basicMaterial);
     
     // Position number
-    numberMesh.position.y = 6;
-    numberMesh.position.z = 0.11;
+    numberMesh.position.y = 18;
+    numberMesh.position.z = 0.26;
     
     // Function to create a data URL for the number
     const createNumberTexture = (number, callback) => {
       // Create a canvas in memory
       const canvas = document.createElement('canvas');
-      canvas.width = 128;
-      canvas.height = 128;
+      canvas.width = 384;
+      canvas.height = 384;
       
       const context = canvas.getContext('2d');
       
@@ -126,7 +139,7 @@ class Gate {
       context.fillRect(0, 0, canvas.width, canvas.height);
       
       // Draw the number
-      context.font = 'Bold 80px Arial';
+      context.font = 'Bold 240px Arial';
       context.textAlign = 'center';
       context.textBaseline = 'middle';
       context.fillStyle = '#FF7F00'; // Orange color
@@ -155,15 +168,15 @@ class Gate {
     
     // Add a duplicate on the back side
     const backNumberMesh = numberMesh.clone();
-    backNumberMesh.position.z = -0.11;
+    backNumberMesh.position.z = -0.26;
     backNumberMesh.rotation.y = Math.PI;
     this.object.add(backNumberMesh);
   }
   
   createBoundingBox() {
     // Create an invisible box for collision detection
-    const gateRadius = 5;
-    const gateDepth = 2;
+    const gateRadius = 15;
+    const gateDepth = 6;
     
     // Create a slightly larger box than the visible gate
     const boxGeometry = new THREE.BoxGeometry(gateRadius * 2, gateRadius * 2, gateDepth);
@@ -195,6 +208,34 @@ class Gate {
     this.exitPlane = new THREE.Mesh(planeGeometry, planeMaterial);
     this.exitPlane.position.z = gateDepth + 0.5;
     this.object.add(this.exitPlane);
+  }
+  
+  // Method to reset the gate state and appearance
+  reset() {
+    this.isPassed = false;
+    this.isMissed = false;
+    this.isTarget = false;
+    this.stopPulseEffect(); // Stop any pulsing
+
+    // Reset visual appearance to default orange
+    const orangeColor = 0xFF7F00; 
+    this.object.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material.color) {
+        if (child.material.emissive) {
+          child.material.emissive.set(0xFF4500); // Default emissive
+          child.material.emissiveIntensity = 0.3;
+        }
+        if (!child.material.map) { // Don't change texture-mapped materials
+          child.material.color.set(orangeColor);
+        }
+        // Ensure transparency is reset if it was changed
+        if (child.material.transparent && child.material.opacity < 1) {
+            child.material.opacity = 1.0; 
+            child.material.transparent = false;
+        }
+      }
+    });
+    // Reset number color if needed (assuming it wasn't changed)
   }
   
   setPassed() {
@@ -254,6 +295,12 @@ class Gate {
         }
       });
     }, 1000);
+  }
+  
+  // Add compatibility method for the engine
+  setCompleted() {
+    console.log(`Gate ${this.id + 1} setCompleted called - calling setPassed()`);
+    this.setPassed();
   }
   
   setTarget() {
