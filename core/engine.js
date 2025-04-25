@@ -26,7 +26,12 @@ class GameEngine {
   initThreeJs() {
     // Create scene
     this.scene = new THREE.Scene();
+    
+    // Create simple sky background (fallback)
     this.scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+    
+    // Create sky gradient
+    this.setupSkyGradient();
 
     // Create default camera (will be replaced by aircraft's chase camera)
     this.defaultCamera = new THREE.PerspectiveCamera(
@@ -55,6 +60,17 @@ class GameEngine {
     this.directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     this.directionalLight.position.set(1, 3, 2);
     this.directionalLight.castShadow = true;
+    
+    // Improve shadow quality
+    this.directionalLight.shadow.mapSize.width = 2048;
+    this.directionalLight.shadow.mapSize.height = 2048;
+    this.directionalLight.shadow.camera.near = 0.5;
+    this.directionalLight.shadow.camera.far = 100;
+    this.directionalLight.shadow.camera.left = -50;
+    this.directionalLight.shadow.camera.right = 50;
+    this.directionalLight.shadow.camera.top = 50;
+    this.directionalLight.shadow.camera.bottom = -50;
+    
     this.scene.add(this.directionalLight);
 
     // Enable shadows
@@ -64,83 +80,202 @@ class GameEngine {
     // Handle window resize
     window.addEventListener('resize', () => this.handleResize());
   }
+  
+  setupSkyGradient() {
+    // Create a sky gradient using a simpler approach
+    const topColor = new THREE.Color(0x3284FF); // Bright blue at top
+    const bottomColor = new THREE.Color(0xC4E0FF); // Light blue at horizon
+    
+    // Create a large dome for the sky
+    const skyGeometry = new THREE.SphereGeometry(500, 32, 15, 0, Math.PI * 2, 0, Math.PI / 2);
+    
+    // Create a solid blue material instead of using shaders which might be causing issues
+    const skyMaterial = new THREE.MeshBasicMaterial({
+      color: 0x87CEEB, // Sky blue
+      side: THREE.BackSide
+    });
+    
+    const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+    this.scene.add(sky);
+  }
 
   setupEnvironment() {
-    // Create voxel-style terrain
-    this.createVoxelTerrain();
+    // Create flat ground plane
+    this.createGroundPlane();
     
     // Add clouds
     this.createClouds();
     
-    // Add distant mountains
-    this.createMountains();
+    // Add river instead of mountains
+    this.createRiver();
   }
   
-  createVoxelTerrain() {
-    // Create ground plane with voxel-style terrain
-    const terrainSize = 100;
-    const terrainResolution = 50;
-    const terrainHeightMap = [];
+  createGroundPlane() {
+    // Create a large flat ground plane
+    const groundSize = 1000;
     
-    // Generate random height map
-    for (let i = 0; i < terrainResolution; i++) {
-      terrainHeightMap[i] = [];
-      for (let j = 0; j < terrainResolution; j++) {
-        // Generate smoother terrain using Perlin-like approach
-        const distance = Math.sqrt(Math.pow(i - terrainResolution/2, 2) + Math.pow(j - terrainResolution/2, 2));
-        const baseHeight = Math.sin(i * 0.1) * Math.cos(j * 0.1) * 2;
-        const randomFactor = Math.random() * 0.5;
-        terrainHeightMap[i][j] = baseHeight + randomFactor;
+    // Create a gradient material for the ground from green to darker green
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x7CFC00, // Light green
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    
+    // Add a subtle checkerboard pattern
+    const gridSize = 100;
+    const gridResolution = 100;
+    const gridGeometry = new THREE.PlaneGeometry(groundSize, groundSize, gridResolution, gridResolution);
+    const ground = new THREE.Mesh(gridGeometry, groundMaterial);
+    
+    // Add some slight vertex displacement for a more natural look
+    const vertices = gridGeometry.attributes.position.array;
+    for (let i = 0; i < vertices.length; i += 3) {
+      // Only adjust y (height) for subtle terrain variation
+      // Don't modify the edges to keep a clean horizon
+      const x = vertices[i];
+      const z = vertices[i + 2];
+      const distFromCenter = Math.sqrt(x * x + z * z);
+      
+      if (distFromCenter < groundSize * 0.4) {
+        // Only modify interior vertices to keep a flat boundary
+        vertices[i + 1] = (Math.sin(x * 0.05) * Math.cos(z * 0.05) * 0.5) - 0.5;
       }
     }
     
-    // Create terrain group
-    this.terrain = new THREE.Group();
+    // Need to update the geometry after modifying vertices
+    gridGeometry.attributes.position.needsUpdate = true;
+    gridGeometry.computeVertexNormals();
     
-    // Create terrain with voxel cubes based on height map
-    const cubeSize = terrainSize / terrainResolution;
-    const groundMaterials = [
-      new THREE.MeshStandardMaterial({ color: 0x8B4513 }), // Brown
-      new THREE.MeshStandardMaterial({ color: 0x7CFC00 }), // Green
-      new THREE.MeshStandardMaterial({ color: 0x556B2F })  // Dark green
-    ];
+    // Rotate to be horizontal and position below the aircraft
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -5;
     
-    const cubeGeometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+    // Enable shadows
+    ground.receiveShadow = true;
     
-    for (let i = 0; i < terrainResolution; i++) {
-      for (let j = 0; j < terrainResolution; j++) {
-        const height = terrainHeightMap[i][j];
-        const cubeCount = Math.max(1, Math.floor(height + 3));
-        
-        for (let k = 0; k < cubeCount; k++) {
-          // Choose material based on height (grass on top, dirt below)
-          let materialIndex;
-          if (k === cubeCount - 1) {
-            materialIndex = 1; // Top layer is green
-          } else if (k === cubeCount - 2) {
-            materialIndex = 2; // Second layer is dark green
-          } else {
-            materialIndex = 0; // Lower layers are brown
-          }
-          
-          const cube = new THREE.Mesh(cubeGeometry, groundMaterials[materialIndex]);
-          cube.position.x = (i - terrainResolution/2) * cubeSize;
-          cube.position.y = (k - 5) * cubeSize; // Offset to position terrain below aircraft
-          cube.position.z = (j - terrainResolution/2) * cubeSize;
-          
-          // Only add cubes that will be visible
-          if (i % 2 === 0 && j % 2 === 0) {
-            this.terrain.add(cube);
-          }
-        }
-      }
+    this.scene.add(ground);
+    this.ground = ground;
+    
+    // Add a second, darker ground plane extending to the horizon
+    const farGroundGeometry = new THREE.PlaneGeometry(groundSize * 3, groundSize * 3);
+    const farGroundMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3A5F0B, // Darker green
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
+    const farGround = new THREE.Mesh(farGroundGeometry, farGroundMaterial);
+    farGround.rotation.x = -Math.PI / 2;
+    farGround.position.y = -5.5; // Slightly below main ground
+    farGround.receiveShadow = true;
+    
+    this.scene.add(farGround);
+  }
+  
+  createRiver() {
+    // Create a river flowing from south to north (along the z-axis)
+    const riverWidth = 20;
+    const riverLength = 800;
+    
+    // Create river geometry - slightly above ground to prevent z-fighting
+    const riverGeometry = new THREE.PlaneGeometry(riverWidth, riverLength, 20, 20);
+    
+    // Create water material
+    const riverMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4A87FF, // Blue color for water
+      roughness: 0.2,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    // Create river mesh
+    const river = new THREE.Mesh(riverGeometry, riverMaterial);
+    
+    // Position river horizontally and rotate to align south to north
+    river.rotation.x = -Math.PI / 2;
+    river.position.y = -4.8; // Slightly above ground
+    
+    // Add some variation to the river path - gentle curves
+    const vertices = riverGeometry.attributes.position.array;
+    for (let i = 0; i < vertices.length; i += 3) {
+      const z = vertices[i + 2]; // Z position along river length
+      
+      // Slightly undulate the x position to make the river meander
+      vertices[i] += Math.sin(z * 0.01) * 10;
     }
     
-    this.scene.add(this.terrain);
+    riverGeometry.attributes.position.needsUpdate = true;
+    riverGeometry.computeVertexNormals();
+    
+    this.scene.add(river);
+    
+    // Add river banks - slightly raised areas along the river
+    this.createRiverBanks(river);
+  }
+  
+  createRiverBanks(river) {
+    // Create raised areas along the river banks
+    const bankWidth = 5;
+    const bankLength = 800;
+    
+    // East bank
+    const eastBankGeometry = new THREE.PlaneGeometry(bankWidth, bankLength, 10, 40);
+    const bankMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513, // Brown color for river bank
+      roughness: 0.9,
+      metalness: 0.1
+    });
+    
+    const eastBank = new THREE.Mesh(eastBankGeometry, bankMaterial);
+    eastBank.rotation.x = -Math.PI / 2;
+    eastBank.position.y = -4.7; // Slightly above river
+    eastBank.position.x = 12.5; // Position along right side of river
+    
+    // Add some height variation to the bank
+    const eastVertices = eastBankGeometry.attributes.position.array;
+    for (let i = 0; i < eastVertices.length; i += 3) {
+      const z = eastVertices[i + 2]; // Z position along river length
+      
+      // Make the bank follow the river curve
+      eastVertices[i] += Math.sin(z * 0.01) * 10;
+      
+      // Add some height variation
+      eastVertices[i + 1] = Math.random() * 0.5;
+    }
+    
+    eastBankGeometry.attributes.position.needsUpdate = true;
+    eastBankGeometry.computeVertexNormals();
+    
+    this.scene.add(eastBank);
+    
+    // West bank
+    const westBankGeometry = new THREE.PlaneGeometry(bankWidth, bankLength, 10, 40);
+    const westBank = new THREE.Mesh(westBankGeometry, bankMaterial);
+    westBank.rotation.x = -Math.PI / 2;
+    westBank.position.y = -4.7; // Slightly above river
+    westBank.position.x = -12.5; // Position along left side of river
+    
+    // Add some height variation to the bank
+    const westVertices = westBankGeometry.attributes.position.array;
+    for (let i = 0; i < westVertices.length; i += 3) {
+      const z = westVertices[i + 2]; // Z position along river length
+      
+      // Make the bank follow the river curve
+      westVertices[i] += Math.sin(z * 0.01) * 10;
+      
+      // Add some height variation
+      westVertices[i + 1] = Math.random() * 0.5;
+    }
+    
+    westBankGeometry.attributes.position.needsUpdate = true;
+    westBankGeometry.computeVertexNormals();
+    
+    this.scene.add(westBank);
   }
   
   createClouds() {
-    const cloudCount = 10;
+    const cloudCount = 15;
     const cloudMaterial = new THREE.MeshStandardMaterial({ 
       color: 0xFFFFFF,
       transparent: true,
@@ -157,6 +292,11 @@ class GameEngine {
       // Create main cloud cube
       const mainCloudGeo = new THREE.BoxGeometry(cloudSize, cloudSize * 0.5, cloudSize);
       const mainCloud = new THREE.Mesh(mainCloudGeo, cloudMaterial);
+      
+      // Make clouds cast soft shadows
+      mainCloud.castShadow = true;
+      mainCloud.receiveShadow = false;
+      
       cloudGroup.add(mainCloud);
       
       // Add additional cloud blocks
@@ -170,43 +310,27 @@ class GameEngine {
         block.position.y = (Math.random() - 0.5) * 0.2 * cloudSize;
         block.position.z = (Math.random() - 0.5) * cloudSize;
         
+        // Make cloud blocks cast soft shadows
+        block.castShadow = true;
+        block.receiveShadow = false;
+        
         cloudGroup.add(block);
       }
       
       // Position cloud in scene
-      cloudGroup.position.x = (Math.random() - 0.5) * 80;
-      cloudGroup.position.y = 15 + Math.random() * 10; 
-      cloudGroup.position.z = (Math.random() - 0.5) * 80;
+      cloudGroup.position.x = (Math.random() - 0.5) * 120;
+      cloudGroup.position.y = 15 + Math.random() * 15; 
+      cloudGroup.position.z = (Math.random() - 0.5) * 120;
       
-      this.clouds.push(cloudGroup);
+      this.clouds.push({
+        group: cloudGroup,
+        speed: 0.05 + Math.random() * 0.05,
+        bobSpeed: 0.2 + Math.random() * 0.3,
+        bobHeight: 0.05 + Math.random() * 0.1,
+        startY: cloudGroup.position.y
+      });
+      
       this.scene.add(cloudGroup);
-    }
-  }
-  
-  createMountains() {
-    // Create distant mountains
-    const mountainCount = 5;
-    const mountainMaterial = new THREE.MeshStandardMaterial({ color: 0x556B2F });
-    
-    for (let i = 0; i < mountainCount; i++) {
-      const mountainHeight = 10 + Math.random() * 15;
-      const mountainWidth = 10 + Math.random() * 20;
-      
-      // Create mountain using a cone
-      const mountainGeo = new THREE.ConeGeometry(mountainWidth, mountainHeight, 4);
-      const mountain = new THREE.Mesh(mountainGeo, mountainMaterial);
-      
-      // Position mountain at the edge of the scene
-      const angle = (i / mountainCount) * Math.PI * 2;
-      const distance = 40 + Math.random() * 10;
-      mountain.position.x = Math.cos(angle) * distance;
-      mountain.position.y = -5 + mountainHeight * 0.5;
-      mountain.position.z = Math.sin(angle) * distance;
-      
-      // Random rotation
-      mountain.rotation.y = Math.random() * Math.PI;
-      
-      this.scene.add(mountain);
     }
   }
 
@@ -224,14 +348,23 @@ class GameEngine {
     this.aircraft = new Aircraft(this.inputHandler);
     
     // Add aircraft to scene
-    this.scene.add(this.aircraft.getObject());
+    const aircraftObject = this.aircraft.getObject();
+    this.scene.add(aircraftObject);
     this.objects.push(this.aircraft);
+    
+    // Setup aircraft shadows
+    aircraftObject.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
     
     // Use aircraft's camera as the active camera
     this.activeCamera = this.aircraft.getCamera();
     
     // Position aircraft at starting point
-    this.aircraft.getObject().position.set(0, 10, -20); // Higher altitude to match image
+    aircraftObject.position.set(0, 10, -20); // Higher altitude to match the flat ground
   }
 
   handleResize() {
@@ -249,14 +382,14 @@ class GameEngine {
       this.clock.start();
       this.isRunning = true;
       this.animate();
-      console.log('Game loop started');
     }
   }
 
   stop() {
-    this.isRunning = false;
-    this.clock.stop();
-    console.log('Game loop stopped');
+    if (this.isRunning) {
+      this.clock.stop();
+      this.isRunning = false;
+    }
   }
 
   animate() {
@@ -265,43 +398,56 @@ class GameEngine {
     // Request next frame
     requestAnimationFrame(() => this.animate());
 
-    // Calculate time delta
+    // Calculate delta time and update elapsed time
     this.deltaTime = this.clock.getDelta();
     this.elapsedTime = this.clock.getElapsedTime();
 
-    // Update game objects
+    // Update game state
     this.update(this.deltaTime, this.elapsedTime);
 
-    // Render the scene with the active camera
+    // Render the scene
     this.renderer.render(this.scene, this.activeCamera);
   }
 
   update(deltaTime, elapsedTime) {
     // Update all game objects
-    this.objects.forEach(object => {
-      if (typeof object.update === 'function') {
-        object.update(deltaTime, elapsedTime);
+    for (const object of this.objects) {
+      if (object.update) {
+        object.update(deltaTime);
       }
-    });
+    }
     
-    // Gently bob the clouds
-    this.clouds.forEach((cloud, index) => {
-      cloud.position.y += Math.sin(elapsedTime * 0.5 + index) * 0.01;
-    });
+    // Animate clouds (bobbing up and down)
+    for (const cloud of this.clouds) {
+      // Move clouds slowly sideways
+      cloud.group.position.x += cloud.speed * deltaTime;
+      
+      // Reset cloud when it moves too far
+      if (cloud.group.position.x > 100) {
+        cloud.group.position.x = -100;
+      }
+      
+      // Bob clouds up and down
+      cloud.group.position.y = cloud.startY + Math.sin(elapsedTime * cloud.bobSpeed) * cloud.bobHeight;
+    }
+    
+    // Add water animation - subtle wave effect
+    if (this.river) {
+      // Animate river water
+      this.river.material.offset.y = elapsedTime * 0.05;
+    }
   }
 
-  // Method to add objects to the scene and update list
   addObject(object) {
-    this.scene.add(object);
     this.objects.push(object);
+    this.scene.add(object.getObject ? object.getObject() : object);
   }
 
-  // Method to remove objects from the scene and update list
   removeObject(object) {
-    this.scene.remove(object);
     const index = this.objects.indexOf(object);
     if (index !== -1) {
       this.objects.splice(index, 1);
+      this.scene.remove(object.getObject ? object.getObject() : object);
     }
   }
 }
