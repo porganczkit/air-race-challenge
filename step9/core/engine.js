@@ -89,9 +89,9 @@ class GameEngine {
     this.directionalLight.position.set(100, 200, 50); // Position the sun for longer shadows
     this.directionalLight.castShadow = true;
     
-    // Improve shadow quality and coverage
-    this.directionalLight.shadow.mapSize.width = 4096; // Increased resolution
-    this.directionalLight.shadow.mapSize.height = 4096; // Increased resolution
+    // Reduce shadow quality for performance
+    this.directionalLight.shadow.mapSize.width = 2048; // Reduced from 4096
+    this.directionalLight.shadow.mapSize.height = 2048; // Reduced from 4096
     this.directionalLight.shadow.camera.near = 0.5;
     this.directionalLight.shadow.camera.far = 1000; // Increased far plane for shadows
     this.directionalLight.shadow.camera.left = -500;
@@ -145,6 +145,9 @@ class GameEngine {
     
     // Add Chain Bridge (Lánchíd) as the ninth obstacle
     this.createChainBridge();
+    
+    // Add people to the landscape
+    this.createPeople();
   }
   
   createGroundPlane() {
@@ -643,6 +646,37 @@ class GameEngine {
         }
       }
       
+      // Animate people walking
+      if (this.people) {
+        for (const person of this.people) {
+          // Walking animation
+          const walkOffset = Math.sin(elapsedTime * person.walkSpeed + person.walkPhase) * person.walkDistance;
+          
+          // Move person along their walk direction
+          person.group.position.x = person.initialPosition.x + person.walkDirection.x * walkOffset;
+          person.group.position.z = person.initialPosition.z + person.walkDirection.z * walkOffset;
+          
+          // Make the person face their walking direction
+          if (Math.abs(person.walkDirection.x) > 0.001 || Math.abs(person.walkDirection.z) > 0.001) {
+            person.group.rotation.y = Math.atan2(person.walkDirection.x, person.walkDirection.z);
+          }
+          
+          // Simple leg animation while walking
+          if (person.group.children[2] && person.group.children[3]) { // left and right legs
+            const legAngle = Math.sin(elapsedTime * person.walkSpeed * 3 + person.walkPhase) * 0.2;
+            person.group.children[2].rotation.x = legAngle;
+            person.group.children[3].rotation.x = -legAngle;
+          }
+          
+          // Simple arm animation while walking
+          if (person.group.children[4] && person.group.children[5]) { // left and right arms
+            const armAngle = Math.sin(elapsedTime * person.walkSpeed * 3 + person.walkPhase) * 0.3;
+            person.group.children[4].rotation.x = -armAngle;
+            person.group.children[5].rotation.x = armAngle;
+          }
+        }
+      }
+      
       // Animate birds flying
       if (this.birds) {
         for (const bird of this.birds) {
@@ -772,258 +806,216 @@ class GameEngine {
 
   createChainBridge() {
     try {
-      console.log('Creating Chain Bridge (Lánchíd) as 9th obstacle...');
+      console.log('Creating Minecraft-style Chain Bridge at position Z=1150...');
       
-      // Use a fixed position at z=1100 as requested
-      const bridgeZ = 1100;
-      console.log(`Positioning bridge at fixed position Z=${bridgeZ}`);
+      // Position the bridge at z=1150
+      const bridgeZ = 1150;
       
-      // Bridge dimensions based on the Széchenyi Chain Bridge in Budapest
-      const bridgeWidth = 60;  // Spans across the river
-      const bridgeLength = 25; // Width of the bridge
-      const bridgeHeight = 30;
+      // Bridge dimensions based on the reference image
+      const bridgeWidth = 120;  // Width across river
+      const bridgeLength = 80;  // Length of bridge roadway
+      const bridgeHeight = 60;  // Height including towers
       
-      // Materials based on the image
+      // Create materials with Minecraft-like block appearance
       const stoneMaterial = new THREE.MeshStandardMaterial({
-        color: 0xDCDCDC, // Light stone/concrete color
+        color: 0xEEEEEE, // Light stone color
         roughness: 0.9,
-        metalness: 0.1
+        metalness: 0.1,
+        emissive: 0x222222 // Add some self-illumination for visibility
       });
       
-      const chainMaterial = new THREE.MeshStandardMaterial({
-        color: 0x336699, // Blue-green tint like in the image
-        roughness: 0.6,
-        metalness: 0.7
+      const bluePillarMaterial = new THREE.MeshStandardMaterial({
+        color: 0x2244CC, // Blue color matching reference image
+        roughness: 0.7,
+        metalness: 0.4,
+        emissive: 0x111133 // Add some self-illumination
       });
       
       const roadMaterial = new THREE.MeshStandardMaterial({
-        color: 0x555555, // Dark gray for road
+        color: 0x999999, // Medium gray for road surface
         roughness: 0.8,
-        metalness: 0.2
+        metalness: 0.2,
+        emissive: 0x111111 // Add some self-illumination
       });
 
-      const towerTrimMaterial = new THREE.MeshStandardMaterial({
-        color: 0xEEEEEE, // White stone trim
-        roughness: 0.7,
-        metalness: 0.3
+      const lightMaterial = new THREE.MeshStandardMaterial({
+        color: 0xFFFFAA, // Warm light color
+        roughness: 0.3,
+        metalness: 0.7,
+        emissive: 0xFFDD22, // Strong emissive for lamp glow
+        emissiveIntensity: 0.8
       });
       
       // Create a container for all bridge components
       this.bridge = new THREE.Group();
       
-      // Position the bridge directly across the path
-      this.bridge.position.set(0, 0, bridgeZ);
+      // Position the bridge directly across the river path
+      // Using the river's meandering formula: riverX = Math.sin(z * 0.01) * 10
+      const riverX = Math.sin(bridgeZ * 0.01) * 10;
       
-      // Rotate the bridge a further 22.5 degrees to the right (now fully straight)
-      this.bridge.rotation.y = 0; // 0 degrees (straight orientation)
+      // Set pillar spacing to match the river width + banks
+      const riverWidth = 20;
+      const bankWidth = 10;
+      const pillarSpacing = riverWidth + (bankWidth * 2) + 20; // ~60 units for wider span
       
-      // Tower dimensions
-      const pillarWidth = 10;
-      const pillarDepth = 10;
-      const pillarHeight = bridgeHeight;
-      const pillarSpacing = 40; // Wider span to match the image
+      // Center the bridge on the river and lower it to sit on the terrain
+      // Base height of towers is 8, positioned at baseHeight/2 = 4 relative to group.
+      // Ground is at y=-5. Set bridge y position to -5 + 4 = -1.
+      this.bridge.position.set(riverX, -1, bridgeZ);
       
-      // Create decorative arches for the towers - as seen in the image
+      // Rotate the bridge 180 degrees to the left on the y-axis
+      this.bridge.rotation.y = Math.PI; // 180 degrees
+      
+      // Add lights to illuminate the bridge (Simplified: 2 lights)
+      const addBridgeLights = () => {
+        const lightPositions = [
+          [-pillarSpacing/2, 40, 0], // Center light on left tower
+          [pillarSpacing/2, 40, 0]  // Center light on right tower
+        ];
+        
+        for (const pos of lightPositions) {
+          const light = new THREE.PointLight(0xFFDD22, 1, 100);
+          light.position.set(pos[0], pos[1], pos[2]);
+          this.bridge.add(light);
+        }
+      };
+      
+      // Create main towers (Minecraft-like blocks stacked - Simplified)
       const createTower = (xPos) => {
         const tower = new THREE.Group();
         
-        // Main tower base
-        const towerBaseGeometry = new THREE.BoxGeometry(pillarWidth, pillarHeight * 0.3, pillarDepth);
-        const towerBase = new THREE.Mesh(towerBaseGeometry, stoneMaterial);
-        towerBase.position.set(xPos, pillarHeight * 0.15, -bridgeLength/2);
-        tower.add(towerBase);
+        // Base of the tower - rectangular stone blocks
+        const baseWidth = 12;
+        const baseDepth = 12;
+        const baseHeight = 8;
         
-        // Tower columns (create 4 columns in a square)
-        const columnWidth = 3;
-        const columnDepth = 3;
-        const columnHeight = pillarHeight * 0.5;
-        const columnSpacing = 5;
+        // Create tower base
+        const baseGeometry = new THREE.BoxGeometry(baseWidth, baseHeight, baseDepth);
+        const base = new THREE.Mesh(baseGeometry, stoneMaterial);
+        base.position.set(xPos, baseHeight/2, 0);
+        tower.add(base);
         
-        // Four decorative columns on each tower
-        for (let col = 0; col < 2; col++) {
-          for (let row = 0; row < 2; row++) {
-            const columnX = xPos + (col === 0 ? -columnSpacing/2 : columnSpacing/2);
-            const columnZ = -bridgeLength/2 + (row === 0 ? -columnSpacing/2 : columnSpacing/2);
-            
-            const columnGeometry = new THREE.BoxGeometry(columnWidth, columnHeight, columnDepth);
-            const column = new THREE.Mesh(columnGeometry, stoneMaterial);
-            column.position.set(columnX, pillarHeight * 0.3 + columnHeight/2, columnZ);
-            tower.add(column);
-          }
-        }
+        // Create main tower section - blue color like in the image
+        const mainTowerWidth = 8;
+        const mainTowerDepth = 8;
+        const mainTowerHeight = 35;
         
-        // Tower top - the arch structure
-        const towerCapGeometry = new THREE.BoxGeometry(pillarWidth + 2, pillarHeight * 0.2, pillarDepth + 2);
-        const towerCap = new THREE.Mesh(towerCapGeometry, stoneMaterial);
-        towerCap.position.set(xPos, pillarHeight * 0.8, -bridgeLength/2);
-        tower.add(towerCap);
+        const mainTowerGeometry = new THREE.BoxGeometry(mainTowerWidth, mainTowerHeight, mainTowerDepth);
+        const mainTower = new THREE.Mesh(mainTowerGeometry, bluePillarMaterial);
+        mainTower.position.set(xPos, baseHeight + mainTowerHeight/2, 0);
+        tower.add(mainTower);
         
-        // Decorative tower top - squared shaped with trim
-        const towerTopGeometry = new THREE.BoxGeometry(pillarWidth + 4, pillarHeight * 0.18, pillarDepth + 4);
-        const towerTop = new THREE.Mesh(towerTopGeometry, towerTrimMaterial);
-        towerTop.position.set(xPos, pillarHeight * 0.98, -bridgeLength/2);
-        tower.add(towerTop);
+        // Removed lamp on top and decorative details
         
-        // Return the complete tower group
         return tower;
       };
       
-      // Create the two towers on either side of the river
+      // Create suspension cables (Simplified)
+      const createCables = () => {
+        const cableGroup = new THREE.Group();
+        
+        // Main suspension cable as a series of segments
+        const segmentCount = 10; // Reduced from 20
+        const cableThickness = 1.5;
+        
+        // Create 2 main cables (1 on each side, simplified)
+        for (let offset = -5; offset <= 5; offset += 10) {
+          const points = [];
+          
+          // Create catenary curve for the cable
+          for (let i = 0; i <= segmentCount; i++) {
+            const t = i / segmentCount;
+            const x = (t - 0.5) * pillarSpacing;
+            const y = -15 * (4 * Math.pow(t - 0.5, 2) - 1);
+            points.push(new THREE.Vector3(x, y + 45, offset));
+          }
+          
+          // Create cable geometry
+          const cableGeometry = new THREE.TubeGeometry(
+            new THREE.CatmullRomCurve3(points),
+            segmentCount,
+            cableThickness,
+            4, // Reduced radial segments
+            false
+          );
+          
+          const cable = new THREE.Mesh(cableGeometry, stoneMaterial);
+          cableGroup.add(cable);
+        }
+        
+        // Add vertical suspenders connecting main cables to roadway (Simplified)
+        const suspenderCount = 6; // Reduced from 10
+        
+        for (let i = 1; i < suspenderCount; i++) {
+          const t = i / suspenderCount;
+          const x = (t - 0.5) * pillarSpacing;
+          const y = -15 * (4 * Math.pow(t - 0.5, 2) - 1) + 45;
+          
+          if (Math.abs(x) < 10) continue;
+          
+          // Create suspender using simple BoxGeometry
+          const suspenderHeight = y - 5;
+          const suspenderGeometry = new THREE.BoxGeometry(1, suspenderHeight, 1);
+          
+          for (let offset = -5; offset <= 5; offset += 10) {
+            const suspender = new THREE.Mesh(suspenderGeometry, stoneMaterial);
+            suspender.position.set(x, y - suspenderHeight/2, offset);
+            cableGroup.add(suspender);
+          }
+        }
+        
+        return cableGroup;
+      };
+      
+      // Create roadway (Simplified)
+      const createRoadway = () => {
+        const roadGroup = new THREE.Group();
+        
+        // Main roadway as a flat block
+        const roadwayGeometry = new THREE.BoxGeometry(pillarSpacing, 3, bridgeLength);
+        const roadway = new THREE.Mesh(roadwayGeometry, roadMaterial);
+        roadway.position.set(0, 5, 0);
+        roadGroup.add(roadway);
+        
+        // Add railings - Minecraft style blocks
+        const railingHeight = 3;
+        const railingGeometry = new THREE.BoxGeometry(1, railingHeight, bridgeLength);
+        
+        // Add railings on both sides
+        const leftRailing = new THREE.Mesh(railingGeometry, stoneMaterial);
+        leftRailing.position.set(-pillarSpacing/2 + 2, 5 + railingHeight/2, 0);
+        roadGroup.add(leftRailing);
+        
+        const rightRailing = new THREE.Mesh(railingGeometry, stoneMaterial);
+        rightRailing.position.set(pillarSpacing/2 - 2, 5 + railingHeight/2, 0);
+        roadGroup.add(rightRailing);
+        
+        // Removed lamps along the roadway
+        
+        return roadGroup;
+      };
+      
+      // Create left and right towers
       const leftTower = createTower(-pillarSpacing/2);
       const rightTower = createTower(pillarSpacing/2);
       this.bridge.add(leftTower);
       this.bridge.add(rightTower);
       
-      // Create roadway/deck - extended to connect the towers
-      const roadwayGeometry = new THREE.BoxGeometry(pillarSpacing, 2, bridgeLength);
-      const roadway = new THREE.Mesh(roadwayGeometry, roadMaterial);
-      roadway.position.set(0, 10, 0);
+      // Create suspension cables
+      const cables = createCables();
+      this.bridge.add(cables);
+      
+      // Create roadway with railings and lamps
+      const roadway = createRoadway();
       this.bridge.add(roadway);
       
-      // Create suspension chains - more visible and pronounced like in the image
-      const createChains = () => {
-        // Main suspension cables (2 pairs, one on each side)
-        const chainCount = 2;
-        const chainSpacing = bridgeLength * 0.7;
-        
-        for (let side = 0; side < 2; side++) {
-          const zPos = -bridgeLength/2 + side * chainSpacing;
-          
-          // Create two parallel chains on each side
-          for (let chainPair = 0; chainPair < 2; chainPair++) {
-            const chainOffset = chainPair === 0 ? -1 : 1;
-            
-            // Create chain segments
-            const segmentCount = 16; // More segments for smoother curve
-            const segmentLength = pillarSpacing / segmentCount;
-            
-            for (let j = 0; j < segmentCount; j++) {
-              const xPos = -pillarSpacing/2 + j * segmentLength + segmentLength/2;
-              
-              // Chain height follows an elevated parabola to match the image
-              const normalizedPos = (j / (segmentCount-1)) * 2 - 1; // -1 to 1
-              const height = 25 - 15 * (1 - normalizedPos * normalizedPos); // Parabola
-              
-              // Create the chain segment
-              const chainGeometry = new THREE.BoxGeometry(segmentLength * 0.85, 1.2, 1.2);
-              const chainSegment = new THREE.Mesh(chainGeometry, chainMaterial);
-              chainSegment.position.set(xPos, height, zPos + chainOffset);
-              
-              // Calculate rotation to follow the curve
-              if (j > 0 && j < segmentCount - 1) {
-                const prevNormPos = ((j-1) / (segmentCount-1)) * 2 - 1;
-                const prevHeight = 25 - 15 * (1 - prevNormPos * prevNormPos);
-                const nextNormPos = ((j+1) / (segmentCount-1)) * 2 - 1;
-                const nextHeight = 25 - 15 * (1 - nextNormPos * nextNormPos);
-                
-                const angle = Math.atan2(nextHeight - prevHeight, segmentLength * 2);
-                chainSegment.rotation.z = angle;
-              }
-              
-              this.bridge.add(chainSegment);
-            }
-          }
-        }
-      };
-      
-      // Create vertical suspenders connecting chains to roadway
-      const createSuspenders = () => {
-        const suspenderCount = 14; // More suspenders like in the image
-        const suspenderSpacing = pillarSpacing / suspenderCount;
-        
-        for (let i = 0; i < suspenderCount; i++) {
-          const xPos = -pillarSpacing/2 + (i + 0.5) * suspenderSpacing;
-          
-          // Position follows same parabola as chains
-          const normalizedPos = (i / (suspenderCount-1)) * 2 - 1; // -1 to 1 
-          const topHeight = 25 - 15 * (1 - normalizedPos * normalizedPos);
-          
-          // Create suspenders on both sides of the bridge
-          for (let side = 0; side < 2; side++) {
-            const zPos = -bridgeLength/2 + side * bridgeLength * 0.7;
-            const suspenderHeight = topHeight - 10;
-            
-            // Create main suspender
-            const suspenderGeometry = new THREE.BoxGeometry(0.8, suspenderHeight, 0.8);
-            const suspender = new THREE.Mesh(suspenderGeometry, chainMaterial);
-            suspender.position.set(xPos, 10 + suspenderHeight/2, zPos);
-            
-            this.bridge.add(suspender);
-            
-            // Create cross-bracing between suspenders (horizontal elements)
-            if (i < suspenderCount - 1) {
-              const nextXPos = -pillarSpacing/2 + (i + 1.5) * suspenderSpacing;
-              const bracingLength = suspenderSpacing;
-              const bracingHeight = Math.min(topHeight - 10, 
-                25 - 15 * (1 - Math.pow((i+1)/(suspenderCount-1) * 2 - 1, 2)) - 10);
-              
-              const bracingGeometry = new THREE.BoxGeometry(bracingLength, 0.5, 0.5);
-              const bracing = new THREE.Mesh(bracingGeometry, chainMaterial);
-              bracing.position.set((xPos + nextXPos) / 2, 10 + bracingHeight, zPos);
-              
-              this.bridge.add(bracing);
-            }
-          }
-        }
-      };
-      
-      // Create railings and additional details
-      const createStructuralElements = () => {
-        // Add decorative railings
-        const railingHeight = 1.5;
-        
-        // Side railings along the edge
-        const sideRailGeometry = new THREE.BoxGeometry(pillarSpacing, railingHeight, 1);
-        
-        // Front and back railings
-        const frontRailing = new THREE.Mesh(sideRailGeometry, roadMaterial);
-        frontRailing.position.set(0, 10 + railingHeight/2, -bridgeLength/2);
-        this.bridge.add(frontRailing);
-        
-        const backRailing = new THREE.Mesh(sideRailGeometry, roadMaterial);
-        backRailing.position.set(0, 10 + railingHeight/2, bridgeLength/2);
-        this.bridge.add(backRailing);
-        
-        // Left and right railings along the sides
-        const railingGeometry = new THREE.BoxGeometry(1, railingHeight, bridgeLength);
-        
-        const leftRailing = new THREE.Mesh(railingGeometry, roadMaterial);
-        leftRailing.position.set(-pillarSpacing/2, 10 + railingHeight/2, 0);
-        this.bridge.add(leftRailing);
-        
-        const rightRailing = new THREE.Mesh(railingGeometry, roadMaterial);
-        rightRailing.position.set(pillarSpacing/2, 10 + railingHeight/2, 0);
-        this.bridge.add(rightRailing);
-        
-        // Add decorative posts along the railings
-        const postCount = 8;
-        const postSpacing = bridgeLength / postCount;
-        
-        for (let i = 0; i <= postCount; i++) {
-          const zPos = -bridgeLength/2 + i * postSpacing;
-          
-          // Create posts on both sides
-          for (let side = 0; side < 2; side++) {
-            const xPos = (side === 0 ? -1 : 1) * pillarSpacing/2;
-            
-            const postGeometry = new THREE.BoxGeometry(1.5, 3, 1.5);
-            const post = new THREE.Mesh(postGeometry, stoneMaterial);
-            post.position.set(xPos, 10 + 1.5, zPos);
-            
-            this.bridge.add(post);
-          }
-        }
-      };
-      
-      // Build the bridge components
-      createChains();
-      createSuspenders();
-      createStructuralElements();
+      // Add lights
+      addBridgeLights();
       
       // Add the bridge to the scene
       this.scene.add(this.bridge);
       
-      // Add bridge to objects list so it can be collision checked
+      // Create hitbox for bridge
       this.objects.push({
         getObject: () => this.bridge,
         getBoundingBox: () => {
@@ -1032,7 +1024,7 @@ class GameEngine {
         }
       });
       
-      console.log('Chain Bridge created successfully');
+      console.log('Minecraft-style Chain Bridge created successfully');
     } catch (error) {
       console.error('Error creating Chain Bridge:', error);
     }
@@ -1096,8 +1088,8 @@ class GameEngine {
       // Store trees for potential animation
       this.trees = [];
       
-      // Create 100 trees scattered across the landscape
-      const treeCount = 100;
+      // Create 50 trees (reduced from 100 for performance)
+      const treeCount = 50;
       
       // Create materials for trees
       const trunkMaterial = new THREE.MeshStandardMaterial({
@@ -1147,12 +1139,22 @@ class GameEngine {
         
         createFoliage();
         
-        // Position the tree randomly, avoiding the center path where the river is
+        // Position the tree randomly, avoiding the river area
         let x, z;
-        do {
+        let isInRiverArea = true;
+        
+        // Keep trying until we find a position outside the river
+        while (isInRiverArea) {
           x = (Math.random() * 2 - 1) * 400;
           z = (Math.random() * 1600) - 200;  // From -200 to 1400
-        } while (Math.abs(x) < 30 && z > 300 && z < 500); // Avoid the river area
+          
+          // River follows a sine wave path, so check if the tree is too close to that path
+          const riverX = Math.sin(z * 0.01) * 10; // This matches the river meandering formula
+          const distanceFromRiver = Math.abs(x - riverX);
+          
+          // Keep tree away from river plus a buffer to account for river width
+          isInRiverArea = distanceFromRiver < 20; // River width is 20, so keep trees at least 20 units away
+        }
         
         treeGroup.position.set(x, -5, z);
         
@@ -1244,6 +1246,148 @@ class GameEngine {
       console.log(`Created ${birdCount} birds`);
     } catch (error) {
       console.error('Error creating birds:', error);
+    }
+  }
+
+  createPeople() {
+    try {
+      console.log('Creating people...');
+      
+      // Store people for potential animation
+      this.people = [];
+      
+      // Create 50 people (reduced from 100 for performance)
+      const peopleCount = 50;
+      
+      // Create materials for people
+      const bodyMaterial = new THREE.MeshStandardMaterial({
+        color: 0x964B00, // Brown
+        roughness: 0.7,
+        metalness: 0.2
+      });
+      
+      const clothingMaterials = [
+        new THREE.MeshStandardMaterial({
+          color: 0xFF0000, // Red
+          roughness: 0.8,
+          metalness: 0.1
+        }),
+        new THREE.MeshStandardMaterial({
+          color: 0x0000FF, // Blue
+          roughness: 0.8,
+          metalness: 0.1
+        }),
+        new THREE.MeshStandardMaterial({
+          color: 0x00FF00, // Green
+          roughness: 0.8,
+          metalness: 0.1
+        }),
+        new THREE.MeshStandardMaterial({
+          color: 0xFFFF00, // Yellow
+          roughness: 0.8,
+          metalness: 0.1
+        }),
+        new THREE.MeshStandardMaterial({
+          color: 0xFF00FF, // Pink
+          roughness: 0.8,
+          metalness: 0.1
+        })
+      ];
+      
+      // Create people in various locations, avoiding the river area
+      for (let i = 0; i < peopleCount; i++) {
+        // Create a person group
+        const personGroup = new THREE.Group();
+        
+        // Vary person size
+        const personScale = 0.7 + Math.random() * 0.3;
+        
+        // Create head (small cube)
+        const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+        const head = new THREE.Mesh(headGeometry, bodyMaterial);
+        head.position.y = 1.75;
+        head.scale.set(personScale, personScale, personScale);
+        personGroup.add(head);
+        
+        // Create body (tall cube)
+        const clothingMaterial = clothingMaterials[Math.floor(Math.random() * clothingMaterials.length)];
+        const bodyGeometry = new THREE.BoxGeometry(0.6, 1.0, 0.3);
+        const body = new THREE.Mesh(bodyGeometry, clothingMaterial);
+        body.position.y = 1.0;
+        body.scale.set(personScale, personScale, personScale);
+        personGroup.add(body);
+        
+        // Create legs (two thin cubes)
+        const legGeometry = new THREE.BoxGeometry(0.2, 0.8, 0.2);
+        const leftLeg = new THREE.Mesh(legGeometry, bodyMaterial);
+        leftLeg.position.set(-0.15, 0.4, 0);
+        leftLeg.scale.set(personScale, personScale, personScale);
+        personGroup.add(leftLeg);
+        
+        const rightLeg = new THREE.Mesh(legGeometry, bodyMaterial);
+        rightLeg.position.set(0.15, 0.4, 0);
+        rightLeg.scale.set(personScale, personScale, personScale);
+        personGroup.add(rightLeg);
+        
+        // Create arms (two thin cubes)
+        const armGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+        
+        const leftArm = new THREE.Mesh(armGeometry, bodyMaterial);
+        leftArm.position.set(-0.4, 1.1, 0);
+        leftArm.scale.set(personScale, personScale, personScale);
+        personGroup.add(leftArm);
+        
+        const rightArm = new THREE.Mesh(armGeometry, bodyMaterial);
+        rightArm.position.set(0.4, 1.1, 0);
+        rightArm.scale.set(personScale, personScale, personScale);
+        personGroup.add(rightArm);
+        
+        // Position the person randomly, avoiding the river area
+        let x, z;
+        let isInRiverArea = true;
+        
+        // Keep trying until we find a position outside the river
+        while (isInRiverArea) {
+          x = (Math.random() * 2 - 1) * 400;
+          z = (Math.random() * 1600) - 200;  // From -200 to 1400
+          
+          // River follows a sine wave path, so check if the person is too close to that path
+          const riverX = Math.sin(z * 0.01) * 10; // This matches the river meandering formula
+          const distanceFromRiver = Math.abs(x - riverX);
+          
+          // Keep person away from river plus a buffer to account for river width
+          isInRiverArea = distanceFromRiver < 15; // River width is 20, slightly smaller buffer than trees
+        }
+        
+        personGroup.position.set(x, -5, z);
+        
+        // Add slight random rotation for variety
+        personGroup.rotation.y = Math.random() * Math.PI * 2;
+        
+        // Make people cast shadows
+        personGroup.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        
+        this.scene.add(personGroup);
+        
+        // Add animation properties
+        this.people.push({
+          group: personGroup,
+          initialPosition: personGroup.position.clone(),
+          walkSpeed: 0.5 + Math.random() * 0.5,
+          walkDistance: 3 + Math.random() * 5,
+          walkDirection: new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize(),
+          walkPhase: Math.random() * Math.PI * 2
+        });
+      }
+      
+      console.log(`Created ${peopleCount} people`);
+    } catch (error) {
+      console.error('Error creating people:', error);
     }
   }
 }
