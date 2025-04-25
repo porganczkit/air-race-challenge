@@ -6,12 +6,14 @@ import * as THREE from 'three';
 class Aircraft {
   constructor(inputHandler) {
     // Movement properties
-    this.maxSpeed = 40; // Maximum speed
-    this.forwardSpeed = 20; // Initial forward speed
+    this.maxSpeed = 50; // Changed from 52.5 to 50 as requested
+    this.forwardSpeed = 30; // Changed from 35 to 30 as requested
     this.acceleration = 15; // Acceleration rate
     this.turnRate = 1.5; // Adjusted turn rate as requested
     this.pitchRate = 1.0; // Rate of pitch change
     this.rollRate = 2.0; // Rate of roll change
+    this.strafeSpeed = 15; // New: Speed for lateral movement
+    this.verticalSpeed = 15; // New: Speed for vertical movement
     this.maxRollAngle = Math.PI / 2.5; // Increased bank angle (about 72 degrees)
     this.maxPitchAngle = Math.PI / 4; // Maximum pitch angle (45 degrees)
     this.drag = 0.3; // Air resistance
@@ -19,7 +21,7 @@ class Aircraft {
     this.bankingTurnEffect = 0.8; // Increased from 0.5 for more pronounced turning when banking
     
     // Physics state
-    this.velocity = new THREE.Vector3(0, 0, 1); // Initial forward velocity
+    this.velocity = new THREE.Vector3(0, 0, 1); // Initial velocity
     this.angularVelocity = new THREE.Vector3(0, 0, 0); // Rotation momentum
     this.position = new THREE.Vector3(0, 10, 0);
     
@@ -32,6 +34,14 @@ class Aircraft {
     this.targetPitch = 0;
     this.targetYaw = 0;
     this.targetRoll = 0;
+    
+    // Direction controls
+    this.moveForward = false;
+    this.moveBackward = false;
+    this.moveLeft = false;
+    this.moveRight = false;
+    this.moveUp = false;
+    this.moveDown = false;
     
     // Camera properties
     this.cameraDistance = 15; // Distance behind aircraft
@@ -165,21 +175,18 @@ class Aircraft {
     // Get current input state
     const input = this.inputHandler.getInputState();
     
-    // Process vertical movement - UP arrow should point nose up, DOWN arrow should point nose down
+    // Process keyboard input for rotation using arrow keys only
     if (input.up) {
       this.targetPitch = -this.pitchRate; // Negative pitch tilts nose up in Three.js
     } else if (input.down) {
       this.targetPitch = this.pitchRate; // Positive pitch tilts nose down in Three.js
     }
     
-    // Process horizontal movement - LEFT arrow should turn left, RIGHT arrow should turn right
     if (input.left) {
       this.targetYaw = -this.turnRate; // Turn LEFT (negative yaw)
-      // Bank into turns more dramatically
       this.targetRoll = -this.maxRollAngle; // Bank left
     } else if (input.right) {
       this.targetYaw = this.turnRate; // Turn RIGHT (positive yaw)
-      // Bank into turns more dramatically
       this.targetRoll = this.maxRollAngle; // Bank right
     } else {
       // Return to level flight when not turning
@@ -220,14 +227,8 @@ class Aircraft {
     // Calculate forward vector based on aircraft's current orientation
     const forwardVector = new THREE.Vector3(0, 0, 1).applyQuaternion(this.object.quaternion);
     
-    // Update velocity to match aircraft's forward direction
+    // Update velocity to match aircraft's forward direction at constant speed
     this.velocity.copy(forwardVector).normalize().multiplyScalar(this.forwardSpeed);
-    
-    // Apply drag to speed (slight air resistance)
-    this.forwardSpeed *= (1 - this.drag * 0.1 * deltaTime);
-    
-    // Ensure minimum forward speed is maintained
-    this.forwardSpeed = Math.max(16.0, this.forwardSpeed);
     
     // Apply velocity to position
     const movement = this.velocity.clone().multiplyScalar(deltaTime);
@@ -247,7 +248,7 @@ class Aircraft {
   }
   
   updateVisuals(deltaTime) {
-    // Rotate propeller based on throttle and forward speed
+    // Rotate propeller based on forward speed
     if (this.propeller) {
       this.propeller.rotation.z += deltaTime * 15 * (this.forwardSpeed / 10);
     }
