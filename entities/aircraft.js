@@ -238,165 +238,140 @@ class Aircraft {
     this.camera.lookAt(position);
   }
   
+  update(deltaTime) {
+    // Handle user input
+    this.handleControls(deltaTime);
+    
+    // Apply physics
+    this.updatePhysics(deltaTime);
+    
+    // Update visual elements
+    this.updateVisuals(deltaTime);
+    
+    // Update camera
+    // This is handled in engine.js now for smoother interpolation
+    // this.updateCamera();
+  }
+
   handleControls(deltaTime) {
     // Only process controls if we have an input handler
     if (!this.inputHandler) return;
-    
+
+    // Reset target values
+    this.targetPitch = 0;
+    this.targetYaw = 0;
+    this.targetRoll = 0;
+
     // Get current input state
     const input = this.inputHandler.getInputState();
-    
-    // Calculate target pitch, roll, yaw and vertical velocity based on input
-    let targetPitch = 0;
-    let targetRoll = 0;
-    let targetYaw = 0;
-    let targetVerticalVelocity = 0;
-    
-    // Process vertical movement - UP arrow should ascend, DOWN arrow should descend
-    if (input.ArrowUp) {
-      targetPitch = -this.pitchRate * 0.5; // Visual nose up (negative pitch tilts nose up)
-      targetVerticalVelocity = this.verticalSpeed; // Move UP (positive Y)
-    } else if (input.ArrowDown) {
-      targetPitch = this.pitchRate * 0.5; // Visual nose down (positive pitch tilts nose down)
-      targetVerticalVelocity = -this.verticalSpeed; // Move DOWN (negative Y)
+
+    // Process vertical movement - UP arrow should point nose up, DOWN arrow should point nose down
+    if (input.up) {
+      this.targetPitch = -this.pitchRate; // Negative pitch tilts nose up in Three.js
+    } else if (input.down) {
+      this.targetPitch = this.pitchRate; // Positive pitch tilts nose down in Three.js
     }
-    
+
     // Process horizontal movement - LEFT arrow should turn left, RIGHT arrow should turn right
-    if (input.ArrowLeft) {
-      targetYaw = -this.turnRate * 2; // Turn LEFT (negative yaw)
+    if (input.left) {
+      this.targetYaw = -this.turnRate; // Turn LEFT (negative yaw)
       if (this.bankIntoTurn) {
-        targetRoll = this.maxRollAngle; // Bank into left turn
+        this.targetRoll = this.maxRollAngle; // Bank left
       }
-    } else if (input.ArrowRight) {
-      targetYaw = this.turnRate * 2; // Turn RIGHT (positive yaw)
+    } else if (input.right) {
+      this.targetYaw = this.turnRate; // Turn RIGHT (positive yaw)
       if (this.bankIntoTurn) {
-        targetRoll = -this.maxRollAngle; // Bank into right turn
+        this.targetRoll = -this.maxRollAngle; // Bank right
       }
-    }
-    
-    // Apply more direct control for immediate response
-    this.yaw += targetYaw * deltaTime * 0.5; // Direct control component
-    
-    // Apply inertia to controls - aircraft responds more realistically
-    // First calculate force based on input and aircraft mass
-    const pitchForce = targetPitch / this.mass;
-    const rollForce = targetRoll / this.mass;
-    const yawForce = targetYaw / (this.mass * 0.5); // Reduced mass effect for more responsive turning
-    
-    // Update angular momentum based on forces and delta time
-    this.angularMomentum.x += pitchForce * deltaTime;
-    this.angularMomentum.z += rollForce * deltaTime;
-    this.angularMomentum.y += yawForce * deltaTime;
-    
-    // Apply drag to angular momentum (air resistance)
-    this.angularMomentum.x *= (1 - this.drag * deltaTime);
-    this.angularMomentum.z *= (1 - this.drag * deltaTime);
-    this.angularMomentum.y *= (1 - this.drag * deltaTime);
-    
-    // Update actual pitch, roll, yaw based on angular momentum
-    this.pitch = this.angularMomentum.x;
-    this.roll = this.angularMomentum.z;
-    this.yaw += this.angularMomentum.y * deltaTime;
-    
-    // Apply smoothing to vertical velocity
-    const verticalForce = (targetVerticalVelocity - this.verticalVelocity);
-    this.verticalVelocity += verticalForce * this.smoothingFactor * deltaTime * 10;
-    
-    // Apply drag to vertical velocity
-    if (Math.abs(this.verticalVelocity) > 0.01) {
-      this.verticalVelocity *= (1 - this.drag * deltaTime);
     } else {
-      this.verticalVelocity = 0; // Stop completely when very small
+      // Return to level flight when not turning
+      this.targetRoll = 0;
     }
-    
+
+    // Apply inertia to controls - gradual movement toward target values
+    this.pitch += (this.targetPitch - this.pitch) * this.inertiaFactor * deltaTime;
+    this.yaw += (this.targetYaw - this.yaw) * this.inertiaFactor * deltaTime;
+    this.roll += (this.targetRoll - this.roll) * this.inertiaFactor * deltaTime * 1.5; // Faster roll response
+
+    // Add some drag to slow rotation when not actively controlling
+    if (Math.abs(this.targetPitch) < 0.01) this.pitch *= (1 - this.drag * deltaTime);
+    if (Math.abs(this.targetYaw) < 0.01) this.yaw *= (1 - this.drag * deltaTime);
+    if (Math.abs(this.targetRoll) < 0.01) this.roll *= (1 - this.drag * deltaTime);
+
     // Clamp values to prevent extreme angles
     this.pitch = Math.max(-this.maxPitchAngle, Math.min(this.maxPitchAngle, this.pitch));
     this.roll = Math.max(-this.maxRollAngle, Math.min(this.maxRollAngle, this.roll));
-    
+
     // Limit extreme maneuvers - reduce control effectiveness at high speeds or during extreme angles
-    // This prevents unrealistic flight patterns
     const extremeManeuverFactor = Math.min(
       1.0,
-      1.0 - (Math.abs(this.pitch) / this.maxPitchAngle) * 0.3 - 
+      1.0 - (Math.abs(this.pitch) / this.maxPitchAngle) * 0.3 -
             (Math.abs(this.roll) / this.maxRollAngle) * 0.3
     );
-    
+
     // Apply the limit factor to controls
     this.yaw *= extremeManeuverFactor;
   }
-  
+
   updatePhysics(deltaTime) {
-    // Create a rotation matrix for the yaw (turning)
-    const yawMatrix = new THREE.Matrix4().makeRotationY(-this.yaw * deltaTime); // Inverted to match control directions
-    
-    // Apply the yaw rotation to the velocity vector
-    this.velocity.applyMatrix4(yawMatrix);
-    
-    // Apply drag to forward speed (slight air resistance)
+    // Apply aircraft rotation based on current pitch, roll, yaw values
+    this.object.rotation.x = this.pitch;
+    this.object.rotation.z = this.roll;
+    this.object.rotation.y += this.yaw * deltaTime; // Apply yaw to rotate aircraft left/right
+
+    // Calculate forward vector based on aircraft's current orientation
+    const forwardVector = new THREE.Vector3(0, 0, -1).applyQuaternion(this.object.quaternion); // Forward is -Z
+
+    // Update velocity to match aircraft's forward direction
+    this.velocity.copy(forwardVector).normalize().multiplyScalar(this.forwardSpeed);
+
+    // Apply drag to speed (slight air resistance)
     this.forwardSpeed *= (1 - this.drag * 0.1 * deltaTime);
-    
-    // Ensure minimum forward speed is maintained (aircraft cannot stop mid-air)
-    this.forwardSpeed = Math.max(4.0, this.forwardSpeed);
-    
-    // Normalize the velocity and scale it to current forward speed
-    this.velocity.normalize().multiplyScalar(this.forwardSpeed);
-    
-    // Create a movement vector combining forward velocity and vertical movement
+
+    // Ensure minimum forward speed is maintained
+    this.forwardSpeed = Math.max(16.0, this.forwardSpeed);
+
+    // Apply velocity to position
     const movement = this.velocity.clone().multiplyScalar(deltaTime);
-    
-    // Apply vertical velocity separately
-    movement.y = this.verticalVelocity * deltaTime;
-    
-    // Apply the combined movement to the position
     this.object.position.add(movement);
-    
-    // Reset object rotation to identity before applying new rotations
-    // This prevents cumulative rotation issues
-    this.object.rotation.set(0, 0, 0);
-    
-    // Get the direction of travel
-    const direction = this.velocity.clone().normalize();
-    
-    // Align the aircraft to face the direction of travel
-    // By default, the aircraft is built facing the negative Z axis
-    // We want the aircraft to face the velocity direction
-    const quaternion = new THREE.Quaternion();
-    
-    // Compute rotation to align negative Z (aircraft front) with velocity
-    const negativeZAxis = new THREE.Vector3(0, 0, -1);
-    quaternion.setFromUnitVectors(negativeZAxis, direction);
-    
-    // Apply the rotation to the aircraft
-    this.object.setRotationFromQuaternion(quaternion);
-    
-    // Apply pitch as a rotation around the local X axis
-    this.object.rotateX(-this.pitch); // Invert pitch to fix direction (negative pitch for nose up)
-    
-    // Apply roll as a rotation around the local Z axis
-    this.object.rotateZ(this.roll);
-  }
-  
-  update(deltaTime) {
-    // Rotate propeller for visual effect
-    if (this.propeller) {
-      this.propeller.rotation.x += deltaTime * 20;
+
+    // Apply banking-induced turning effect
+    // When aircraft banks, it naturally turns in that direction
+    if (Math.abs(this.roll) > 0.05) {
+      const turnEffect = -this.roll * this.bankingTurnEffect * deltaTime;
+      this.object.rotateY(turnEffect);
     }
-    
-    // Handle keyboard input
-    this.handleControls(deltaTime);
-    
-    // Update physics
-    this.updatePhysics(deltaTime);
-    
-    // Update camera position to follow aircraft
-    this.updateCamera();
+
+    // Hard limit on how low the aircraft can go (prevent going underground)
+    if (this.object.position.y < 2) {
+      this.object.position.y = 2;
+    }
   }
+
+  updateVisuals(deltaTime) {
+    // Rotate propeller based on throttle and forward speed
+    const propellerSpeed = this.forwardSpeed * 2; // Base propeller speed on forward motion
+    this.propeller.rotation.z += propellerSpeed * deltaTime;
+  }
+
+  // updateCamera() { // Original camera code now handled in engine.js
+    // // Calculate target position behind the aircraft
+    // const offset = new THREE.Vector3(0, this.cameraHeight, -this.cameraDistance);
+    // offset.applyQuaternion(this.object.quaternion); // Rotate offset by aircraft orientation
+    // const targetPosition = this.object.position.clone().add(offset);
+    
+    // // Smoothly interpolate camera position towards the target
+    // this.camera.position.lerp(targetPosition, 0.1); // Adjust lerp factor for smoothness
+    
+    // // Calculate the look-at position (slightly ahead of the aircraft)
+    // const lookAtPosition = this.object.position.clone().add(new THREE.Vector3(0, 1, 10).applyQuaternion(this.object.quaternion));
+    // this.camera.lookAt(lookAtPosition);
+  // }
   
-  // Gets the Three.js object for adding to the scene
   getObject() {
     return this.object;
   }
   
-  // Gets the camera that follows the aircraft
   getCamera() {
     return this.camera;
   }

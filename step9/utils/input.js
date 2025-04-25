@@ -3,7 +3,7 @@
 
 class InputHandler {
   constructor() {
-    // Input state
+    // Input state - only arrow keys and space
     this.keys = {
       up: false,
       down: false,
@@ -25,9 +25,9 @@ class InputHandler {
       this.handleKeyUp(event);
     });
     
-    // Prevent default behavior for arrow keys to avoid page scrolling
+    // Prevent default behavior for control keys to avoid page scrolling
     document.addEventListener('keydown', (event) => {
-      // Prevent default for arrow keys
+      // Prevent default for arrow keys and space
       if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || 
           event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
           event.key === ' ') {
@@ -37,7 +37,7 @@ class InputHandler {
   }
   
   handleKeyDown(event) {
-    // Update key state based on the pressed key
+    // Update key state based on the pressed key - arrow keys only
     switch (event.key) {
       case 'ArrowUp':
         this.keys.up = true;
@@ -58,7 +58,7 @@ class InputHandler {
   }
   
   handleKeyUp(event) {
-    // Update key state based on the released key
+    // Update key state based on the released key - arrow keys only
     switch (event.key) {
       case 'ArrowUp':
         this.keys.up = false;
