@@ -125,3 +125,30 @@
   - Left/Right keys control turning with proper banking
   - Aircraft movement is smooth with appropriate physics
   - Controls feel responsive but not twitchy 
+
+## Step 7: Add Basic Physics Movement - COMPLETED
+
+- Enhanced the flight physics system with:
+  - Implemented forward motion with constant velocity (~5 units/sec)
+  - Added banking on turns (up to 30° roll when turning left/right)
+  - Increased maximum pitch angles to 45° up/down with realistic momentum
+  - Added physics-based inertia and drag for realistic control feel
+  - Implemented angular momentum for more natural aircraft movement
+  - Limited extreme maneuvers to prevent unrealistic flight patterns
+  - Maintained constant forward velocity with subtle air resistance
+
+- Improved aircraft control handling:
+  - Added mass and force calculations for more physical response
+  - Enhanced control behavior with smooth transitions between states
+  - Implemented better vertical movement with appropriate drag and stopping
+  - Applied limits to control effectiveness during extreme maneuvers
+  - Fine-tuned smoothing factors for responsive but not twitchy controls
+  - Fixed orientation issues for proper visual feedback during ascent/descent
+
+- Test confirmed:
+  - Aircraft maintains appropriate forward velocity
+  - Aircraft banks properly into turns
+  - Controls feel responsive but with appropriate weight and momentum
+  - Extreme maneuvers are limited for more realistic flight behavior
+  - Aircraft exhibits proper inertia, continuing to turn/pitch briefly after key release
+  - Aircraft pitches nose up when ascending and nose down when descending 
