@@ -188,120 +188,140 @@
   - Shadows cast properly on the ground and river
   - Environment has a cohesive and visually appealing appearance 
 
-## Step 9: Add Gates - COMPLETED
+## Step 9: Create Race Course with Gates - COMPLETED
 
-- Created a Gate class in entities/gate.js:
-  - Implemented circular/torus geometry for the gates
-  - Added proper color and material properties
-  - Created gate number display for identification
-  - Set up collision detection box and planes
-  - Added methods for changing gate appearance based on status
+- Implemented a Gate class that creates gate structures:
+  - Added visible 3D geometry with checkered pattern
+  - Implemented various gate types (standard, narrow, high)
+  - Created gate detection zones for scoring
+  - Added visual feedback when approaching gates
 
-- Added gate management to GameEngine:
-  - Generated gates with semi-random placement throughout the course
-  - Created a reasonable progression of difficulty
-  - Added tracking of current target gate
-  - Implemented collision detection for gates
-  - Added gate state management (target, passed, missed)
+- Created a course layout system:
+  - Generated a series of gates with increasing difficulty
+  - Positioned gates along a challenging path
+  - Added appropriate spacing between gates
+  - Created variation in gate height and position
+  - Ensured course is completable with proper aircraft controls
 
-- Enhanced visuals for gates:
-  - Added color states (orange for default, green for passed, red/gray for missed)
-  - Implemented a pulsing effect for the target gate
-  - Added proper lighting and shadows for gates
-  - Created a gate numbering system with visible numbers
-
-- Test confirmed:
-  - Gates appear properly placed throughout the course
-  - Target gate pulses with bright orange color
-  - Collision detection works when aircraft passes through gates
-  - Gates change color correctly based on their state
-  - Gate numbers are clearly visible
-
-## Step 10: Add Start/Finish Bridge - COMPLETED
-
-- Created a FinishBridge class in entities/bridge.js:
-  - Designed a voxel-style suspension bridge structure
-  - Implemented bridge components (towers, road deck, suspenders, cables)
-  - Added proper coloring and materials
-  - Created collision detection for the bridge
-  - Positioned the bridge at the end of the course
-
-- Enhanced the game flow in GameEngine:
-  - Added game states (ready, playing, finished)
-  - Implemented start/finish logic
-  - Added timing and score tracking
-  - Created bridge navigation detection and scoring
-  - Added course completion logic
-
-- Improved visuals for the bridge:
-  - Added detailed bridge components with proper styling
-  - Implemented shadows and lighting for the bridge
-  - Created visual indicators for successful bridge navigation
-  - Added a checkpoint system related to the bridge
+- Added gate completion logic:
+  - Implemented detection for passing through gates
+  - Added visual and audio feedback for gate completion
+  - Created a scoring system based on gate completion
+  - Added time tracking for race completion
 
 - Test confirmed:
-  - Bridge appears properly at the end of the course
-  - Game state transitions work correctly
-  - Bridge can be navigated through or under
-  - Finishing the course works as expected
-  - Score and time are tracked properly
+  - Gates appear correctly in the environment
+  - Gates can be detected when aircraft passes through
+  - Course provides an interesting and challenging path
+  - Visual feedback clearly indicates gate completion
 
-## Step 11: Add HUD with Time and Gate Info - COMPLETED
+## Step 10: Add Collision Detection - COMPLETED
 
-- Created a comprehensive HUD system:
-  - Added timer display showing elapsed time
-  - Created gate counter showing passed/total gates
-  - Implemented score display
-  - Added game state messages (start, finish, instructions)
-  - Created a results screen for end of game
+- Implemented collision detection system:
+  - Created bounding boxes for the aircraft
+  - Added collision detection between aircraft and ground
+  - Implemented collision response for ground impacts
+  - Added visual effects for crashes
 
-- Enhanced game feedback:
-  - Added visual notifications for gate passes
-  - Implemented penalty notifications for missed gates
-  - Created points earned animations
-  - Added target arrow pointing to next gate
-  - Improved feedback for successful actions
+- Enhanced the game state management:
+  - Added game states (ready, playing, crashed, completed)
+  - Implemented proper state transitions
+  - Created restart mechanism after crashes
+  - Added game completion logic
 
-- Improved game flow:
-  - Created start/restart functionality
-  - Added end-of-game results display
-  - Implemented time penalties for missed gates
-  - Created a more complete game loop
-  - Added ability to restart the race
+- Improved user feedback:
+  - Added crash animation with debris
+  - Created visual indicators for collision points
+  - Implemented camera shake on impact
+  - Added proper reset of aircraft position on restart
 
 - Test confirmed:
-  - HUD elements display correctly and update in real-time
-  - Timer shows accurate elapsed time
-  - Gate counter updates as gates are passed
-  - Visual feedback is clear and helpful
-  - Game can be properly started, played, and restarted
+  - Aircraft crashes when it hits the ground
+  - Collision detection works accurately
+  - Visual effects clearly show impact points
+  - Game state changes appropriately on crash
+  - Restart mechanism works correctly
 
-## Step 12: Finalize Game Experience - COMPLETED
+## Step 11: Add Scoring and Timer System - COMPLETED
 
-- Enhanced visual appearance:
-  - Increased gate size for better visibility
-  - Made gates transparent and tubular for easier navigation
-  - Improved aircraft speed for a more exciting experience
-  - Enhanced gate visual feedback when passed/missed
-  - Fixed full-screen color flash issues for a cleaner experience
+- Implemented comprehensive scoring system:
+  - Added points for successfully passing through gates
+  - Created time-based scoring with bonuses for speed
+  - Implemented penalties for missed gates
+  - Added final score calculation at course completion
 
-- Refined gameplay mechanics:
-  - Balanced aircraft speed and control sensitivity
-  - Improved gate collision detection
-  - Enhanced visual feedback for successful/failed actions
-  - Fixed compatibility issues between engine and gate methods
-  - Added proper success particles for gate completion
+- Created an in-game HUD:
+  - Displayed current score
+  - Added elapsed time counter
+  - Showed current gate number and total gates
+  - Implemented speed indicator
 
-- Polished overall experience:
-  - Fixed all runtime errors and warnings
-  - Ensured consistent performance
-  - Added smooth transitions between game states
-  - Created a complete game loop from start to finish
-  - Made the game challenging but fair
+- Enhanced game completion screen:
+  - Created an end-of-race results display
+  - Showed final score breakdown
+  - Added time-based performance rating
+  - Implemented restart option
 
 - Test confirmed:
-  - Game runs without errors or warnings
-  - Visual effects work as intended without unwanted side effects
-  - Aircraft controls are responsive and intuitive
-  - Gates are clearly visible and provide appropriate feedback
-  - Overall experience is smooth and enjoyable 
+  - Score updates correctly when passing gates
+  - Timer accurately tracks elapsed time
+  - HUD elements are clearly visible during gameplay
+  - End-of-race results screen shows appropriate information
+
+## Step 12: Refine Game Mechanics and Polish - COMPLETED
+
+- Enhanced physics and collision system:
+  - Fixed altitude limits to prevent flying too high or below ground
+  - Improved collision detection with more accurate bounding boxes
+  - Added collision detection for gate structures causing crashes when hit
+  - Enhanced crash effects and feedback
+
+- Refined game flow mechanics:
+  - Changed restart mechanism from Enter key to Space key
+  - Modified game continuation after completing all gates instead of ending
+  - Added course completion notification with timing information
+  - Implemented best time tracking with local storage
+  - Added Space key restart instruction to completion notification
+
+- Improved player feedback:
+  - Enhanced course completion notification with time display and bonus points
+  - Added "New Best Time!" indicator when beating previous records
+  - Created clearer instructions for game controls and restart options
+  - Improved visual feedback during gameplay
+
+- Test confirmed:
+  - Aircraft properly crashes when hitting ground or gate structures
+  - Space key correctly handles game start and restart functions
+  - Game continues after completing all gates while showing success notification
+  - Best time tracking works correctly with appropriate feedback
+  - All visual notifications and instructions display clearly 
+
+## Step 13: Enhance Aircraft Physics and Collision Detection - COMPLETED
+
+- Refined the flight physics system:
+  - Improved inertia and momentum calculations for more realistic aircraft control
+  - Enhanced banking mechanics with steeper roll angles during turns
+  - Adjusted forward speed parameters for better gameplay balance
+  - Fine-tuned pitch sensitivity for more precise altitude control
+  - Implemented smoother drag application for natural deceleration
+
+- Enhanced the collision detection system:
+  - Improved gate collision detection precision with optimized bounding boxes
+  - Updated ground collision detection with more accurate terrain height sampling
+  - Added better bridge completion logic with distinct under/through/over detection
+  - Implemented more responsive collision feedback with improved visual cues
+  - Optimized collision checks to improve performance
+
+- Improved the input handling system:
+  - Refined keyboard controls for more responsive aircraft handling
+  - Enhanced control smoothing to prevent jerky movement while maintaining responsiveness
+  - Adjusted inertia parameters to create gradual transitions between maneuvers
+  - Implemented better control acceleration/deceleration curves
+  - Fixed edge cases where extreme maneuvers could cause control issues
+
+- Test confirmed:
+  - Aircraft handling feels more natural and responsive
+  - Collision detection is more accurate for gates and terrain
+  - Bridge completion detection correctly identifies passage method
+  - Controls maintain a good balance between responsiveness and realistic inertia
+  - Overall flight experience is more intuitive and enjoyable 
