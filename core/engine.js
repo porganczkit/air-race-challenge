@@ -660,9 +660,10 @@ class GameEngine {
       // Check game logic (collisions, gates) only when playing
       if (this.gameState === 'playing') {
         this.checkGateCollisions();
-        // Add other checks like bridge collision, ground collision later
-        // this.checkBridgeCollision(); 
-        // this.checkGroundCollision();
+        // Add other checks for end conditions
+        this.checkGroundCollision();
+        this.checkBridgeCollision();
+        this.checkBridgeCompletion();
       }
 
       // Update HUD (call placeholder)
@@ -745,8 +746,17 @@ class GameEngine {
       nextGate.startPulseEffect();
       console.log(`Next gate: ${this.currentGateIndex + 1}`);
     } else {
-      console.log('All gates completed!');
-      this.finishGame(); // Finish game after last gate passed
+      console.log('All gates completed! Continue flying to the bridge to finish the race.');
+      
+      // Don't finish the game yet - just hide the target arrow
+      // Let the player continue to the bridge where the end conditions will be triggered
+      if (this.targetArrow) {
+        this.targetArrow.visible = false;
+      }
+      
+      // Optional: Show a message guiding the player to the bridge
+      const message = "All gates cleared! Now fly through the bridge to finish the race.";
+      this.showGuidanceNotification(message); // Use a different notification style for guidance
     }
   }
 
@@ -771,8 +781,17 @@ class GameEngine {
       nextGate.startPulseEffect();
       console.log(`Next gate (after miss): ${this.currentGateIndex + 1}`);
     } else {
-        console.log('Last gate missed, course finished.');
-        this.finishGame(); // Finish game after last gate is missed
+      console.log('Last gate missed. Continue flying to the bridge to finish the race.');
+      
+      // Don't finish the game yet - just hide the target arrow
+      // Let the player continue to the bridge where the end conditions will be triggered
+      if (this.targetArrow) {
+        this.targetArrow.visible = false;
+      }
+      
+      // Optional: Show a message guiding the player to the bridge
+      const message = "All gates cleared! Now fly through the bridge to finish the race.";
+      this.showGuidanceNotification(message); // Use a different notification style for guidance
     }
   }
 
@@ -977,7 +996,8 @@ class GameEngine {
     resultElement.style.display = 'none'; // Hidden initially
     resultElement.style.pointerEvents = 'auto'; // Allow clicks on button
     resultElement.innerHTML = `
-      <h2>Course Complete!</h2>
+      <h2 id="result-title">FINISH!</h2>
+      <p id="result-reason" style="font-size: 18px; margin-bottom: 20px; display: none;"></p>
       <p>Time: <span id="result-time">0.0s</span></p>
       <p>Penalty: <span id="result-penalty">0s</span></p>
       <p style="font-weight: bold;">Final Time: <span id="result-final-time">0.0s</span></p>
@@ -987,19 +1007,29 @@ class GameEngine {
     this.hudContainer.appendChild(resultElement);
     this.hudElements.result = resultElement;
 
-    // Add event listener for restart button
-    // Ensure listener is added only once and refers to the correct engine instance
-    const restartButton = resultElement.querySelector('#restart-button');
+    // Give the DOM time to update, then add the event listener
+    setTimeout(() => {
+      const restartButton = document.getElementById('restart-button');
     if (restartButton) {
-        // Remove previous listener if any to prevent duplicates
-        // A more robust way might involve storing the listener function reference
-        restartButton.replaceWith(restartButton.cloneNode(true)); // Clone to remove listeners
-        this.hudContainer.querySelector('#restart-button').addEventListener('click', () => {
+        console.log("Adding click handler to restart button");
+        restartButton.addEventListener('click', () => {
+          console.log("Restart button clicked!");
             this.restartGame();
         });
+        
+        // Make button visually interactive to show it's clickable
+        restartButton.style.cursor = 'pointer';
+        restartButton.style.transition = 'background-color 0.3s';
+        restartButton.addEventListener('mouseover', () => {
+          restartButton.style.backgroundColor = '#4CAF50';
+        });
+        restartButton.addEventListener('mouseout', () => {
+          restartButton.style.backgroundColor = '';
+        });
     } else {
-        console.error('Restart button not found in HUD setup');
+        console.error('Restart button not found in DOM after adding result screen');
     }
+    }, 100);
     
     // Setup space key listener for starting game
     // Use a flag to prevent multiple listeners if setupHUD is called again
@@ -1087,9 +1117,9 @@ class GameEngine {
     console.log("Game started at time:", this.gameStartTime);
   }
 
-  finishGame() {
+  finishGame(endCondition = 'completed', reason = '') {
     if (this.gameState !== 'playing') return;
-    console.log("Finishing game...");
+    console.log(`Finishing game... Condition: ${endCondition}, Reason: ${reason}`);
     this.gameState = 'finished';
     this.finalTime = this.clock.getElapsedTime() - this.gameStartTime;
     const finalAdjustedTime = this.finalTime + this.penaltyTime;
@@ -1100,6 +1130,27 @@ class GameEngine {
 
     // Update and display results in HUD
     if (this.hudElements && this.hudElements.result) {
+        // Set result title based on end condition
+        let resultTitle = document.getElementById('result-title');
+        if (resultTitle) {
+            if (endCondition === 'crashed') {
+                resultTitle.textContent = 'CRASHED!';
+                resultTitle.style.color = 'red';
+            } else {
+                resultTitle.textContent = 'FINISH!';
+                resultTitle.style.color = 'green';
+            }
+        }
+        
+        // Set reason text if provided
+        let resultReason = document.getElementById('result-reason');
+        if (resultReason && reason) {
+            resultReason.textContent = reason;
+            resultReason.style.display = 'block';
+        } else if (resultReason) {
+            resultReason.style.display = 'none';
+        }
+        
         document.getElementById('result-time').textContent = `${this.finalTime.toFixed(1)}s`;
         document.getElementById('result-penalty').textContent = `${this.penaltyTime}s`;
         document.getElementById('result-final-time').textContent = `${finalAdjustedTime.toFixed(1)}s`;
@@ -1107,8 +1158,48 @@ class GameEngine {
         this.hudElements.result.style.display = 'block';
     }
 
-    // Optional: Stop aircraft controls
+    // Display a message about the end condition
+    this.showEndConditionMessage(endCondition, reason);
+
+    // Optional: Stop aircraft controls - should be implemented in future
     // this.inputHandler.disable(); 
+  }
+
+  // Show message about end condition
+  showEndConditionMessage(endCondition, reason) {
+    let message = '';
+    
+    if (endCondition === 'crashed') {
+      message = `CRASHED: ${reason}`;
+    } else {
+      message = `FINISH: ${reason}`;
+    }
+    
+    const notificationElement = document.createElement('div');
+    notificationElement.textContent = message;
+    notificationElement.style.position = 'absolute';
+    notificationElement.style.top = '30%';
+    notificationElement.style.left = '50%';
+    notificationElement.style.transform = 'translate(-50%, -50%)';
+    notificationElement.style.color = endCondition === 'crashed' ? 'red' : 'green';
+    notificationElement.style.fontSize = '36px';
+    notificationElement.style.fontWeight = 'bold';
+    notificationElement.style.textAlign = 'center';
+    notificationElement.style.textShadow = '2px 2px 4px rgba(0, 0, 0, 0.5)';
+    notificationElement.style.zIndex = '1000';
+    notificationElement.style.fontFamily = 'Arial, sans-serif';
+    notificationElement.style.padding = '20px';
+    notificationElement.style.borderRadius = '10px';
+    notificationElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    
+    document.body.appendChild(notificationElement);
+    
+    // Remove notification after 5 seconds
+    setTimeout(() => {
+      if (document.body.contains(notificationElement)) {
+        document.body.removeChild(notificationElement);
+      }
+    }, 5000);
   }
 
   restartGame() {
@@ -1129,6 +1220,17 @@ class GameEngine {
     // Reset gate states
     this.gates.forEach(gate => gate.reset ? gate.reset() : console.warn('Gate reset method missing')); 
     
+    // Set the first gate as target again
+    if (this.gates.length > 0) {
+      this.gates[0].setTarget();
+      this.gates[0].startPulseEffect();
+    }
+    
+    // Make the target arrow visible again
+    if (this.targetArrow) {
+      this.targetArrow.visible = true;
+    }
+    
     // Set game state to ready
     this.gameState = 'ready';
 
@@ -1143,10 +1245,155 @@ class GameEngine {
       this.hudElements.gates.textContent = `Gates: 0/${this.gates.length}`;
     }
 
-    // Ensure controls are ready
-    // this.inputHandler.enable();
+    console.log("Game ready to restart. Press SPACE to begin.");
+  }
 
-    console.log("Game ready to start.");
+  // Method to check if the aircraft has touched the ground (end condition 1)
+  checkGroundCollision() {
+    if (!this.aircraft || this.gameState !== 'playing') return;
+    
+    const aircraftObject = this.aircraft.getObject();
+    const aircraftPosition = new THREE.Vector3();
+    aircraftObject.getWorldPosition(aircraftPosition);
+    
+    // Use the actual ground level from createGroundPlane
+    const groundLevel = -5; // Correct ground level
+    
+    // Log aircraft position always to see what's happening
+    console.log(`[DEBUG] Aircraft Y Position: ${aircraftPosition.y.toFixed(2)}, Ground Level: ${groundLevel}`);
+    
+    // Check if aircraft is at or below ground level threshold
+    if (aircraftPosition.y <= groundLevel) {
+      console.log('End condition: Aircraft crashed into the ground!');
+      this.finishGame('crashed', 'Crash! Your aircraft hit the ground');
+    }
+  }
+  
+  // Method to check if the aircraft has crashed into the bridge (end condition 2)
+  checkBridgeCollision() {
+    if (!this.aircraft || !this.finishBridge || this.gameState !== 'playing') return;
+    
+    const aircraftObject = this.aircraft.getObject();
+    const bridgeObject = this.finishBridge.getObject();
+    
+    // Get positions for debugging
+    const aircraftPosition = new THREE.Vector3();
+    aircraftObject.getWorldPosition(aircraftPosition);
+    
+    const bridgePosition = new THREE.Vector3();
+    bridgeObject.getWorldPosition(bridgePosition);
+    
+    // Debug: Log positions when aircraft is near the bridge
+    const distanceToBridge = aircraftPosition.distanceTo(bridgePosition);
+    if (distanceToBridge < 100) {
+      console.log(`[DEBUG] Bridge check - Distance: ${distanceToBridge.toFixed(2)}, Aircraft Z: ${aircraftPosition.z.toFixed(2)}, Bridge Z: ${bridgePosition.z.toFixed(2)}`);
+    }
+    
+    // Create bounding boxes for collision detection
+    const aircraftBounds = new THREE.Box3().setFromObject(aircraftObject);
+    const bridgeBounds = new THREE.Box3().setFromObject(bridgeObject);
+    
+    // Check if the aircraft's bounding box intersects with the bridge's bounding box
+    if (aircraftBounds.intersectsBox(bridgeBounds)) {
+      console.log('End condition: Aircraft crashed into bridge');
+      this.finishGame('crashed', 'Bridge collision');
+    }
+  }
+  
+  // Method to check if the aircraft has completed the course by flying under, next to, or above the bridge
+  checkBridgeCompletion() {
+    if (!this.aircraft || !this.finishBridge || this.gameState !== 'playing') return;
+    
+    const aircraftObject = this.aircraft.getObject();
+    const aircraftPosition = new THREE.Vector3();
+    aircraftObject.getWorldPosition(aircraftPosition);
+    
+    const bridgeObject = this.finishBridge.getObject();
+    const bridgePosition = new THREE.Vector3();
+    bridgeObject.getWorldPosition(bridgePosition);
+    
+    // Enhanced completion thresholds
+    const bridgeZThreshold = bridgePosition.z + 20; // Aircraft must pass 20 units beyond bridge Z position
+    const distanceThreshold = 40; // Must be within 40 units on X axis to count as "through"
+    
+    // Debug: Log when the aircraft is past or approaching the bridge
+    if (aircraftPosition.z > bridgePosition.z - 50 && aircraftPosition.z < bridgePosition.z + 50) {
+      console.log(`[DEBUG] Bridge completion check - Aircraft Z: ${aircraftPosition.z.toFixed(2)}, Bridge Z: ${bridgePosition.z.toFixed(2)}, Aircraft Y: ${aircraftPosition.y.toFixed(2)}`);
+    }
+    
+    // Check if aircraft has passed the bridge's Z position
+    if (aircraftPosition.z > bridgeZThreshold) {
+      // Aircraft is past the bridge's Z position
+      console.log(`[DEBUG] Aircraft passed bridge threshold! Lateral distance: ${Math.abs(aircraftPosition.x - bridgePosition.x).toFixed(2)}`);
+      
+      // Calculate the lateral (X-axis) distance from bridge center
+      const lateralDistance = Math.abs(aircraftPosition.x - bridgePosition.x);
+      
+      // Improved bridge height detection based on actual bridge model
+      const bridgeTopY = bridgePosition.y + 12; // Bridge top at ~12 units above base
+      const bridgeBottomY = bridgePosition.y + 4; // Clear area starts ~4 units above base
+      
+      if (lateralDistance <= distanceThreshold) {
+        // Aircraft is in line with the bridge
+        if (aircraftPosition.y < bridgeBottomY) {
+          // Flew under the bridge
+          console.log('End condition: Aircraft flew under the bridge');
+          this.finishGame('completed', 'Flew under bridge');
+        } else if (aircraftPosition.y > bridgeTopY) {
+          // Flew over the bridge
+          console.log('End condition: Aircraft flew over the bridge');
+          this.finishGame('completed', 'Flew over bridge');
+        } else {
+          // Flew through the bridge arch
+          console.log('End condition: Aircraft flew through the bridge arch');
+          this.finishGame('completed', 'Flew through bridge arch');
+        }
+      } else {
+        // Flew past but not through the bridge (went around it)
+        console.log('End condition: Aircraft flew around the bridge');
+        this.finishGame('completed', 'Flew around bridge');
+      }
+    }
+  }
+
+  // Add a new method for showing guidance/instruction notifications with different styling
+  showGuidanceNotification(message) {
+    // Create a notification element
+    const notificationElement = document.createElement('div');
+    notificationElement.textContent = message;
+    notificationElement.style.position = 'absolute';
+    notificationElement.style.color = '#00BFFF'; // Light blue color
+    notificationElement.style.fontSize = '24px';
+    notificationElement.style.fontWeight = 'bold';
+    notificationElement.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.7)';
+    notificationElement.style.zIndex = '1010'; // Above other HUD elements
+    notificationElement.style.opacity = '0'; // Start faded out
+    notificationElement.style.transition = 'opacity 0.3s ease-in-out, top 2.5s ease-out';
+    notificationElement.style.textAlign = 'center';
+    notificationElement.style.width = '100%'; // Center horizontally
+    notificationElement.style.pointerEvents = 'none'; // Don't block clicks
+
+    document.body.appendChild(notificationElement);
+
+    // Position calculation 
+    notificationElement.style.left = '0'; 
+    notificationElement.style.top = '30%'; // Position in middle of screen for better visibility
+
+    // Fade in, hold, fade out
+    setTimeout(() => {
+      notificationElement.style.opacity = '1'; // Fade in
+    }, 10); // Small delay to allow transition
+
+    setTimeout(() => {
+      notificationElement.style.opacity = '0'; // Start fade out
+    }, 5000); // Hold for 5 seconds before fading out (longer than penalty notification)
+
+    // Remove element after animation
+    setTimeout(() => {
+      if (notificationElement.parentNode) {
+        notificationElement.parentNode.removeChild(notificationElement);
+      }
+    }, 5500); // Remove after 5.5 seconds
   }
 }
 

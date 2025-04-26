@@ -14,8 +14,8 @@ class Aircraft {
     // Create aircraft parts
     this.createAircraftMesh();
     
-    // Set initial position
-    this.object.position.set(0, 0, 0);
+    // Set initial position (higher starting position)
+    this.object.position.set(0, 15, -20); // Start higher up
     
     // Physics properties
     this.forwardSpeed = 5; // Constant forward velocity
@@ -23,21 +23,24 @@ class Aircraft {
     this.acceleration = new THREE.Vector3(0, 0, 0);
     this.rotationVelocity = new THREE.Vector3(0, 0, 0);
     
-    // Control parameters
-    this.maxPitchAngle = Math.PI / 4; // 45 degrees max pitch (increased from 30)
+    // Control parameters - More responsive controls
+    this.maxPitchAngle = Math.PI / 3; // 60 degrees max pitch (increased from 45)
     this.maxRollAngle = Math.PI / 6; // 30 degrees max roll
-    this.turnRate = 2.0; // Increased turn rate for more responsive turning
-    this.pitchRate = 0.8; // How fast the aircraft pitches
-    this.verticalSpeed = 3.0; // Speed for ascending/descending
+    this.turnRate = 2.5; // Increased turn rate
+    this.pitchRate = 1.2; // Higher pitch rate for more responsive controls
+    this.verticalSpeed = 2.5; // REDUCED from 5.0 to make it easier to descend
     this.bankIntoTurn = true; // Roll when turning
     
-    // Physics parameters
+    // Physics parameters - More realistic physics for crashing
     this.mass = 1.0; // Aircraft mass for inertia calculations
     this.drag = 0.2; // Air resistance
     this.inertia = 0.8; // How much momentum the aircraft maintains
     
+    // Gravity effect - add to make the aircraft naturally descend
+    this.gravity = 3.0; // INCREASED from 1.5 to make aircraft descend faster
+    
     // Movement smoothing
-    this.smoothingFactor = 0.1; // Lower = more smoothing but slower response
+    this.smoothingFactor = 0.2; // Increased for more responsive feel
     
     // Current state
     this.pitch = 0;
@@ -335,21 +338,50 @@ class Aircraft {
     // Ensure minimum forward speed is maintained
     this.forwardSpeed = Math.max(16.0, this.forwardSpeed);
 
-    // Apply velocity to position
-    const movement = this.velocity.clone().multiplyScalar(deltaTime);
-    this.object.position.add(movement);
+    // Apply gravity effect (makes aircraft naturally descend)
+    // Gravity is stronger when nose is down, less when nose is up
+    const gravityEffect = this.gravity * Math.cos(this.pitch) * deltaTime;
+    
+    // Vertical movement based on pitch and gravity
+    let verticalMovement = 0;
+    
+    // When nose is up, fight gravity based on pitch amount
+    if (this.pitch < 0) {
+      // Lift increases with negative pitch (nose up) - REDUCED EFFECT
+      verticalMovement += -this.pitch * this.verticalSpeed * 0.8; // Reduced lift effect
+    } else {
+      // When nose is down, enhance gravity
+      verticalMovement -= this.pitch * this.verticalSpeed * 0.8; // Increased downward acceleration
+    }
+    
+    // Apply gravity (always pushing down) - INCREASED EFFECT
+    verticalMovement -= gravityEffect * 1.5; // Increased gravity effect
+    
+    // Log position before applying movement
+    console.log(`[DEBUG] Aircraft Position (pre-move): Y=${this.object.position.y.toFixed(2)}, Pitch=${this.pitch.toFixed(2)}, Gravity=${gravityEffect.toFixed(2)}`);
+    
+    // Calculate forward movement based on velocity
+    const forwardMovement = this.velocity.clone().multiplyScalar(deltaTime);
+    
+    // Create combined movement vector with both forward motion and vertical component
+    const combinedMovement = new THREE.Vector3(
+      forwardMovement.x,
+      forwardMovement.y + verticalMovement * deltaTime, // Add the vertical component (scaled by deltaTime)
+      forwardMovement.z
+    );
+    
+    // Apply the combined movement
+    this.object.position.add(combinedMovement);
 
     // Apply banking-induced turning effect
     // When aircraft banks, it naturally turns in that direction
     if (Math.abs(this.roll) > 0.05) {
-      const turnEffect = -this.roll * this.bankingTurnEffect * deltaTime;
+      const turnEffect = -this.roll * 0.3 * deltaTime; // Simplified banking effect
       this.object.rotateY(turnEffect);
     }
-
-    // Hard limit on how low the aircraft can go (prevent going underground)
-    if (this.object.position.y < 2) {
-      this.object.position.y = 2;
-    }
+    
+    // Log position after movement
+    console.log(`[DEBUG] Aircraft Position (post-move): Y=${this.object.position.y.toFixed(2)}`);
   }
 
   updateVisuals(deltaTime) {
@@ -385,8 +417,8 @@ class Aircraft {
 
   // Method to reset aircraft state to initial values
   reset() {
-      // Reset position and rotation
-      this.object.position.set(0, 10, -20); // Example starting position
+      // Reset position and rotation - start much higher
+      this.object.position.set(0, 20, -20); // Start at height 20 instead of 10
       this.object.rotation.set(0, 0, 0); 
       this.object.quaternion.set(0, 0, 0, 1);
 
@@ -403,7 +435,7 @@ class Aircraft {
       // Update camera immediately to reflect reset position
       this.updateCamera(); 
       
-      console.log("Aircraft reset to initial state.");
+      console.log("Aircraft reset to initial state at higher altitude.");
   }
 }
 
