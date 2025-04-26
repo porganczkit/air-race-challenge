@@ -51,8 +51,48 @@ class GameEngine {
     // Initialize components
     this.initThreeJs();
     this.setupEnvironment();
-    this.setupTrees();
-    this.setupPeople();
+    
+    // Create a row of trees directly in the constructor (no Tree class dependency)
+    try {
+      console.log("Creating row of trees directly in constructor");
+      
+      // Row of trees in front of player
+      const groundY = -5; // Ground level
+      for (let x = -40; x <= 40; x += 20) {
+        const z = 30; // Fixed distance in front
+        
+        // Create tree group
+        const treeGroup = new THREE.Group();
+        treeGroup.position.set(x, groundY, z);
+        
+        // Trunk (cylinder)
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(2, 3, 20, 8),
+          new THREE.MeshBasicMaterial({ color: 0x8B4513 }) // Brown
+        );
+        trunk.position.y = 10; // Position trunk
+        treeGroup.add(trunk);
+        
+        // Foliage (cone)
+        const foliage = new THREE.Mesh(
+          new THREE.ConeGeometry(10, 30, 8),
+          new THREE.MeshBasicMaterial({ color: 0x00FF00 }) // Green
+        );
+        foliage.position.y = 30; // Position foliage on top of trunk
+        treeGroup.add(foliage);
+        
+        // Add to scene
+        this.scene.add(treeGroup);
+        
+        console.log(`Row tree created at position (${x}, ${groundY}, ${z})`);
+      }
+      
+      console.log("Row of trees created successfully");
+    } catch (error) {
+      console.error("Error creating row of trees:", error);
+    }
+    
+    // Regular component setup
     this.setupAircraft();
     this.setupGates();
     this.setupFinishBridge();
@@ -63,6 +103,8 @@ class GameEngine {
   }
 
   initThreeJs() {
+    console.log("Starting initThreeJs with tree creation");
+    
     // Create scene
     this.scene = new THREE.Scene();
     
@@ -123,10 +165,91 @@ class GameEngine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // ABSOLUTE DIRECT APPROACH: Create trees as simple primitives right here
+    try {
+      console.log("Creating simple trees directly in initThreeJs");
+      
+      // Create 10 very simple trees
+      for (let i = 0; i < 10; i++) {
+        // Calculate tree position in a circle
+        const angle = (i / 10) * Math.PI * 2;
+        const radius = 50;
+        const x = Math.cos(angle) * radius;
+        const z = Math.sin(angle) * radius;
+        const y = -5; // Ground level
+        
+        // Create a simplest possible cone + cylinder tree
+        const treeGroup = new THREE.Group();
+        treeGroup.position.set(x, y, z);
+        
+        // Simple trunk (brown cylinder)
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(2, 3, 20, 8),
+          new THREE.MeshBasicMaterial({ color: 0x8B4513 })
+        );
+        trunk.position.y = 10; // Half of trunk height
+        treeGroup.add(trunk);
+        
+        // Simple foliage (green cone)
+        const foliage = new THREE.Mesh(
+          new THREE.ConeGeometry(10, 30, 8),
+          new THREE.MeshBasicMaterial({ color: 0x00FF00 })
+        );
+        foliage.position.y = 30; // Trunk height + half of cone height
+        treeGroup.add(foliage);
+        
+        // Add the tree to the scene
+        this.scene.add(treeGroup);
+        
+        console.log(`Simple tree ${i+1} created at position (${x}, ${y}, ${z})`);
+      }
+      
+      // ADD THREE MASSIVE UNMISSABLE TREES
+      console.log("Creating 3 MASSIVE trees");
+      
+      // Positions for massive trees
+      const massiveTreePositions = [
+        { x: 0, y: -5, z: 30 },    // Directly in front
+        { x: -30, y: -5, z: 0 },   // Left side
+        { x: 30, y: -5, z: 0 }     // Right side
+      ];
+      
+      massiveTreePositions.forEach((pos, index) => {
+        // Create MASSIVE tree
+        const massiveTree = new THREE.Group();
+        massiveTree.position.set(pos.x, pos.y, pos.z);
+        
+        // MASSIVE trunk
+        const massiveTrunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(5, 7, 50, 8),
+          new THREE.MeshBasicMaterial({ color: 0xFF0000 }) // RED for visibility
+        );
+        massiveTrunk.position.y = 25; // Half height
+        massiveTree.add(massiveTrunk);
+        
+        // MASSIVE foliage
+        const massiveFoliage = new THREE.Mesh(
+          new THREE.SphereGeometry(20, 8, 8), // Use sphere instead of cone
+          new THREE.MeshBasicMaterial({ color: 0x00FF00 }) // Bright green
+        );
+        massiveFoliage.position.y = 60; // Above trunk
+        massiveTree.add(massiveFoliage);
+        
+        // Add to scene
+        this.scene.add(massiveTree);
+        
+        console.log(`MASSIVE tree ${index+1} created at (${pos.x}, ${pos.y}, ${pos.z})`);
+      });
+      
+      console.log("Direct tree creation completed");
+    } catch (error) {
+      console.error("ERROR in direct tree creation:", error);
+    }
+
     // Handle window resize
     window.addEventListener('resize', () => this.handleResize());
     
-    console.log('Three.js initialized');
+    console.log('Three.js initialized with trees');
   }
   
   setupSkyGradient() {
@@ -516,33 +639,54 @@ class GameEngine {
   
   // Method to setup trees
   setupTrees() {
-    const treeCount = 50;
-    const groundY = -5; // From createGroundPlane
-    const placementRadius = 500; // Spread trees within this radius
-    const exclusionRadius = 50; // Keep clear area around center (0,0)
-
-    for (let i = 0; i < treeCount; i++) {
-      let x, z;
-      let isValidPosition = false;
-      while (!isValidPosition) {
-        x = (Math.random() * 2 - 1) * placementRadius;
-        z = (Math.random() * 2 - 1) * placementRadius;
-        // Check if outside exclusion zone
-        if (Math.sqrt(x*x + z*z) > exclusionRadius) {
-            // Basic check to avoid placing directly in river (adjust if river path is complex)
-            if (Math.abs(x) > 15) { // Assuming river is roughly centered around x=0 with width 20
-                 isValidPosition = true;
-            }
+    console.log('SETUP TREES: Starting setup with simplified extreme debug approach');
+    
+    // Create just a few trees in specific positions
+    const treePositions = [
+      { name: "Front Tree", x: 0, z: 30 },
+      { name: "Left Tree", x: -20, z: 20 },
+      { name: "Right Tree", x: 20, z: 20 },
+      { name: "Far Tree", x: 0, z: 50 }
+    ];
+    
+    const groundY = -5; // Ground level
+    
+    // Add each tree individually
+    treePositions.forEach((pos, index) => {
+      try {
+        console.log(`SETUP TREES: Creating ${pos.name} at (${pos.x}, ${groundY}, ${pos.z})`);
+        const tree = new Tree(new THREE.Vector3(pos.x, groundY, pos.z));
+        this.scene.add(tree.getObject());
+        console.log(`SETUP TREES: Successfully added ${pos.name}`);
+      } catch (error) {
+        console.error(`SETUP TREES: Failed to create ${pos.name}:`, error);
+      }
+    });
+    
+    // Create a grid of trees around the origin
+    console.log("SETUP TREES: Creating grid pattern trees");
+    const gridSize = 2; // 2x2 grid 
+    const spacing = 40; // 40 units between trees
+    
+    for (let x = -gridSize; x <= gridSize; x++) {
+      for (let z = -gridSize; z <= gridSize; z++) {
+        // Skip the origin (0,0) where the aircraft starts
+        if (x === 0 && z === 0) continue;
+        
+        const xPos = x * spacing;
+        const zPos = z * spacing;
+        
+        try {
+          console.log(`SETUP TREES: Creating grid tree at (${xPos}, ${groundY}, ${zPos})`);
+          const tree = new Tree(new THREE.Vector3(xPos, groundY, zPos));
+          this.scene.add(tree.getObject());
+        } catch (error) {
+          console.error(`SETUP TREES: Failed to create grid tree at (${xPos}, ${groundY}, ${zPos}):`, error);
         }
       }
-
-      // Y position needs to account for the base of the tree model
-      const tree = new Tree(new THREE.Vector3(x, groundY, z)); 
-      this.scene.add(tree.getObject());
-      // Add to objects if tree needs updates, otherwise just add to scene
-      // this.objects.push(tree); 
     }
-    console.log(`Added ${treeCount} trees.`);
+    
+    console.log('SETUP TREES: Tree setup completed');
   }
 
   // Method to setup people
@@ -551,29 +695,70 @@ class GameEngine {
     const groundY = -5; // From createGroundPlane
     const placementRadius = 400; // Place people closer than trees
     const exclusionRadius = 40; // Keep clear area around center
+    
+    // River properties - based on createRiver method
+    const riverWidth = 20; 
+    const bankWidth = 5; // Extra buffer zone
+    const totalRiverWidth = riverWidth + (bankWidth * 2); // Total area to avoid
+    
+    // Bridge properties - based on setupFinishBridge method
+    const bridgeZPosition = 500; // Bridge Z position
+    const bridgeX = 0; // Bridge is centered at X=0
+    const bridgeWidth = 50; // Bridge width (along X-axis)
+    const bridgeLength = 50; // Bridge length (along Z-axis)
+    const bridgeBufferRadius = 20; // Buffer around bridge (smaller than for trees)
 
+    console.log('Placing people, avoiding river and bridge...');
+    
     for (let i = 0; i < personCount; i++) {
-       let x, z;
-       let isValidPosition = false;
-        while (!isValidPosition) {
-            x = (Math.random() * 2 - 1) * placementRadius;
-            z = (Math.random() * 2 - 1) * placementRadius;
-             // Check if outside exclusion zone
-            if (Math.sqrt(x*x + z*z) > exclusionRadius) {
-                // Basic check to avoid placing directly in river
-                 if (Math.abs(x) > 15) { 
-                    isValidPosition = true;
-                 }
-            }
+      let x, z;
+      let isValidPosition = false;
+      let attemptCount = 0;
+      const maxAttempts = 100; // Prevent infinite loops
+      
+      while (!isValidPosition && attemptCount < maxAttempts) {
+        attemptCount++;
+        
+        // Generate random position
+        x = (Math.random() * 2 - 1) * placementRadius;
+        z = (Math.random() * 2 - 1) * placementRadius;
+        
+        // 1. Check if outside central exclusion zone
+        if (Math.sqrt(x*x + z*z) <= exclusionRadius) {
+          continue; // Skip this position
         }
+        
+        // 2. Check if in river - account for meandering path
+        const riverCenterX = Math.sin(z * 0.01) * 10; // Meandering formula from createRiver
+        const distanceFromRiver = Math.abs(x - riverCenterX);
+        if (distanceFromRiver <= totalRiverWidth / 2) {
+          continue; // Skip - too close to river
+        }
+        
+        // 3. Check if too close to bridge
+        const distanceToBridge = Math.sqrt(
+          Math.pow(x - bridgeX, 2) + 
+          Math.pow(z - bridgeZPosition, 2)
+        );
+        if (distanceToBridge <= Math.max(bridgeWidth, bridgeLength) / 2 + bridgeBufferRadius) {
+          continue; // Skip - too close to bridge
+        }
+        
+        // All checks passed
+        isValidPosition = true;
+      }
 
-      // Y position needs to account for the base of the person model (bottom of feet)
+      if (!isValidPosition) {
+        console.log(`Couldn't find valid position for person ${i+1} after ${maxAttempts} attempts`);
+        continue; // Skip this person
+      }
+
+      // Create person at valid position
       const person = new Person(new THREE.Vector3(x, groundY, z));
       this.scene.add(person.getObject());
-      // Add to objects if person needs updates
-      // this.objects.push(person);
     }
-    console.log(`Added ${personCount} people.`);
+    
+    console.log(`Added ${personCount} people, avoiding river and bridge.`);
   }
 
   handleResize() {
@@ -1394,6 +1579,79 @@ class GameEngine {
         notificationElement.parentNode.removeChild(notificationElement);
       }
     }, 5500); // Remove after 5.5 seconds
+  }
+
+  // EMERGENCY DIRECT TREES - Bypass the Tree class entirely
+  createDirectTrees() {
+    console.log('Creating 50 direct trees with THREE.js primitives...');
+    
+    // Ground level
+    const groundY = -5;
+    
+    // Create trees at specific locations
+    const fixedPositions = [
+      { x: 0, z: 30 },
+      { x: -20, z: 20 },
+      { x: 20, z: 20 },
+      { x: 0, z: 50 },
+      { x: 50, z: 50 },
+      { x: -50, z: 50 },
+      { x: 50, z: -50 },
+      { x: -50, z: -50 },
+      { x: 100, z: 0 },
+      { x: -100, z: 0 }
+    ];
+    
+    // Create fixed-position trees
+    for (const pos of fixedPositions) {
+      this.createSingleTree(pos.x, groundY, pos.z);
+      console.log(`Fixed tree created at (${pos.x}, ${groundY}, ${pos.z})`);
+    }
+    
+    // Create additional random trees
+    for (let i = 0; i < 40; i++) {
+      const x = (Math.random() * 400) - 200;
+      const z = (Math.random() * 400) - 200;
+      
+      // Skip positions near the river (assuming river is roughly at x=0)
+      if (Math.abs(x) < 15) continue;
+      
+      this.createSingleTree(x, groundY, z);
+    }
+    
+    console.log('50 direct trees created with THREE.js primitives');
+  }
+  
+  // Helper method to create a single tree
+  createSingleTree(x, y, z) {
+    // Create a tree trunk (cylinder)
+    const trunkHeight = 30;
+    const trunkGeometry = new THREE.CylinderGeometry(2, 3, trunkHeight, 8);
+    const trunkMaterial = new THREE.MeshBasicMaterial({ color: 0xA52A2A }); // Brown
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    
+    // Position the trunk with base at ground level
+    trunk.position.set(x, y + (trunkHeight / 2), z);
+    this.scene.add(trunk);
+    
+    // Create a tree canopy (cone)
+    const canopyHeight = 40;
+    const canopyGeometry = new THREE.ConeGeometry(10, canopyHeight, 8);
+    const canopyMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00 }); // Bright green
+    const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
+    
+    // Position the canopy on top of the trunk
+    canopy.position.set(x, y + trunkHeight + (canopyHeight / 2) - 5, z);
+    this.scene.add(canopy);
+    
+    // Create a marker sphere at the base
+    const markerGeometry = new THREE.SphereGeometry(5, 16, 16);
+    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x0000FF }); // Blue
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    
+    // Position the marker at the base of the tree
+    marker.position.set(x, y, z);
+    this.scene.add(marker);
   }
 }
 

@@ -325,3 +325,31 @@
   - Bridge completion detection correctly identifies passage method
   - Controls maintain a good balance between responsiveness and realistic inertia
   - Overall flight experience is more intuitive and enjoyable 
+
+## Step 13a: Add Trees to Terrain - COMPLETED
+
+- Implemented tree generation across the terrain:
+  - Added 50 small trees scattered throughout the landscape
+  - Created trees using THREE.js primitives (cylinders for trunks, cones for foliage)
+  - Positioned trees randomly while avoiding river areas
+  - Scaled trees appropriately to match the environment scale
+  - Implemented proper materials with MeshStandardMaterial for realistic lighting
+
+- Enhanced visual appearance of trees:
+  - Applied realistic coloring (brown trunks, green foliage)
+  - Configured proper material properties (roughness, metalness)
+  - Enabled shadow casting and receiving for all tree components
+  - Ensured trees blend naturally with the terrain
+
+- Implemented reliable tree creation method:
+  - Added trees directly from main.js for guaranteed creation
+  - Used delayed initialization to ensure proper scene setup
+  - Added logging for tree creation tracking
+  - Ensured compatibility with existing game components
+
+- Test confirmed:
+  - Trees appear correctly scattered across the terrain
+  - Trees cast and receive shadows properly
+  - Trees avoid the river area as intended
+  - Trees provide visual interest to the previously empty terrain
+  - Game performance remains good with the addition of multiple tree objects 
